@@ -4,8 +4,7 @@ $x_t = \uptheta_1* x_1 + ... + \uptheta_{i_t} * x_{i_t}$
 
 In this case, theta is the proportion of activity committed to each group in waiting, where theta is a policy-adjusted variable such that it sums up to 1. In this case, the wait list is given by: 
 
-$w_t = \sum_{i=0}^{\i} a_{i_t}*z_{i_t} - \uptheta_{i_t} *c$
-$\[ \sum_{n=1}^{\infty} 2^{-n} = 1 \]	$
+$w_t = \sum_{i=0} a_{i_t}*z_{i_t} - \uptheta_{i_t} *c$
 Where a represents the proportion of waiters that drop off at every given period t based on how long they've been waiting.
 
 This analysis can thus derive three key variables:
@@ -16,4 +15,11 @@ This analysis can thus derive three key variables:
 
 Tentative results are positive: here we model a massive shock to the system (in this case, being an exxagerated scenario of COVID-19 where in one month 10 million new clocks started. For the sake of suspension of disbelief, please invent your own disease name)
 
-![Alt Text](https://media.giphy.com/media/vFKqnCdLPNOKc/giphy.gif)
+![Alt Text](https://github.com/zeyadissa/WaitlistModel/blob/main/res/animation.gif)
+
+Crucially we see the impact on average wait times and the proportion of breaches (Which shoot up from 30 to 60%)
+
+![Alt Text](https://github.com/zeyadissa/WaitlistModel/blob/main/res/average prop breach.gif)
+![Alt Text](https://github.com/zeyadissa/WaitlistModel/blob/main/res/Average wait times.gif)
+
+In this case, of course, we assumed $a_i = 1$. In other words, no one dies / drops off the wait list. Which is, initself, an unrealistic assumption but was used merely to show the most extreme of situations.
