@@ -19,7 +19,8 @@ Tentative results are positive: here we model a massive shock to the system (in 
 
 Crucially we see the impact on average wait times and the proportion of breaches (Which shoot up from 30 to 60%)
 
-![Alt Text](https://github.com/zeyadissa/WaitlistModel/blob/main/res/average prop breach.gif)
-![Alt Text](https://github.com/zeyadissa/WaitlistModel/blob/main/res/Average wait times.gif)
+![Alt Text](https://github.com/zeyadissa/WaitlistModel/blob/main/res/average prop breach.png)
+
+![Alt Text](https://github.com/zeyadissa/WaitlistModel/blob/main/res/Average wait times.png)
 
 In this case, of course, we assumed $a_i = 1$. In other words, no one dies / drops off the wait list. Which is, initself, an unrealistic assumption but was used merely to show the most extreme of situations.
