@@ -1,7 +1,7 @@
 This is a simple model to estimate the elective waitlist over time
 
 Where the activity v_t done in each period t corresponds to the following, where c is the constant of capacity available to do an activity at any period.
-v_t=∅_0 c+〖∅_1 c+∅_2 c+⋯+∅〗_i c
+$v_t=∅_0 c+〖∅_1 c+∅_2 c+⋯+∅〗_i c$
 In this case, theta is the proportion of activity committed to each group in waiting, where theta is a policy-adjusted variable such that:
 ∑_(i=0)^i▒〖∅_i〗_t =1
 Where the total wait list at any given period is the sum of all waiters plus an additional set of clock starts represented by z_(0_t ) assuming no activity is closed is:
