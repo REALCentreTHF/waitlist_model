@@ -1,10 +1,11 @@
 This is a simple model to estimate the elective waitlist over time where the activity $x_t$ done in each period t corresponds to the following, where $c$ is the constant of capacity available to do an activity at any period. Under this model, capacity is assumed constant at every period, but can be easily editted to either include manual inputs or a fixed function (Eg: assuming 3% annual growth in capacity or whatever)
 
-$x_t = \uptheta_1* x_1$ 
+$x_t = \uptheta_1* x_1 + ... + \uptheta_i_t * x_i_t$ 
 
-In this case, theta is the proportion of activity committed to each group in waiting, where theta is a policy-adjusted variable such that:
-∑_(i=0)^i▒〖∅_i〗_t =1
-Where the total wait list at any given period is the sum of all waiters plus an additional set of clock starts represented by z_(0_t ) assuming no activity is closed is:
+In this case, theta is the proportion of activity committed to each group in waiting, where theta is a policy-adjusted variable such that it sums up to 1. In this case, the wait list is given by: 
+
+$w_t = /sum(a_i_t*z_i_t - /uptheta_i_t *c)$
+
 w_t=∑_(i=1)^i▒〖a_(i_t ) z_(i_t ) 〗-∅_i c
 In this case, the waitlist at any given period:
 w_t= a_0 〖z_(0_t )-∅_0 c+〖a_1 z〗_(1_t )-∅_1 c+〖〖a_2 z〗_(2_t )-∅〗_2 c+⋯+〖a_i z〗_(i_t )-∅〗_i c
