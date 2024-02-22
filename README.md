@@ -4,7 +4,7 @@ $x_t = \uptheta_1* x_1 + ... + \uptheta_{i_t} * x_{i_t}$
 
 In this case, theta is the proportion of activity committed to each group in waiting, where theta is a policy-adjusted variable such that it sums up to 1. In this case, the wait list is given by: 
 
-$w_t = \sum_{i=0}^{i}(a_{i_t}*z_{i_t} - \uptheta_{i_t} *c)$
+$w_t = \sum_{i=0}^{\i} a_{i_t}*z_{i_t} - \uptheta_{i_t} *c$
 
 Where a represents the proportion of waiters that drop off at every given period t based on how long they've been waiting.
 
