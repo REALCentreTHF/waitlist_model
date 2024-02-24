@@ -32,9 +32,3 @@ Tentative results are positive: here we model a massive shock to the system (in 
 ![Alt Text](https://github.com/zeyadissa/WaitlistModel/blob/main/res/animation.gif)
 
 Crucially we see the impact on average wait times and the proportion of breaches (Which shoot up from 30 to 60%). This is very rudimentary, but it showcases how a shock to the system can break it in the long-term, with no sign of recovery even 2 years down the line (at best, stagnation...)
-
-![Alt Text](https://github.com/zeyadissa/WaitlistModel/blob/main/res/prop_breach.png)
-
-![Alt Text](https://github.com/zeyadissa/WaitlistModel/blob/main/res/wait_times.png)
-
-In this case, of course, we assumed $a_i = 1$. In other words, no one dies / drops off the wait list. Which is, initself, an unrealistic assumption but was used merely to show the most extreme of situations. This model is simple, and thus not intended for definitive use, but merely intended to demonstrate how the size and shape of the waitlist is time-dependent.
