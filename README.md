@@ -1,6 +1,5 @@
 # Elective waitlist model
 
-## What is this?
 This is a simple time-dependant model that models how many people are on the waitlist, how long they've been waiting, at any point in time provided a stream of projected elective referrals. Though the skeletal model is rather rudimentary, it is here to provide a basic approach to elective waitlist modelling and can ideally be improved upon to account for additional complexity regarding time to treatment, severity, and patient severity stratification.
 
 ## How does this model work?
