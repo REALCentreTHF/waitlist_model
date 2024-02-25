@@ -27,7 +27,7 @@ This analysis can thus derive three key variables:
 
 A basic examination using data from Apr21 till now reveals our model matches what happened in reality rather will, with minor variations and differences likely due to the probablistic nature of guessing how many will 'drop off' the wait list at any given point and the variation in capacity (which here we assumed constant).
 
-![Alt Text](https://github.com/zeyadissa/WaitlistModel/blob/main/res/diagnostics.gif)
+![Alt Text](https://github.com/zeyadissa/WaitlistModel/blob/main/res/diagnostic.gif)
 
 ## COVID-19 analog: a model of a huge uptick in referrals
 
