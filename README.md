@@ -25,6 +25,10 @@ This analysis can thus derive three key variables:
 
 ## Diagnostics
 
+A basic examination using data from Apr21 till now reveals our model matches what happened in reality rather will, with minor variations and differences likely due to the probablistic nature of guessing how many will 'drop off' the wait list at any given point and the variation in capacity (which here we assumed constant).
+
+![Alt Text](https://github.com/zeyadissa/WaitlistModel/blob/main/res/diagnostics.gif)
+
 ## COVID-19 analog: a model of a huge uptick in referrals
 
 Tentative results are positive: here we model a massive shock to the system (in this case, being an exxagerated scenario of COVID-19 where in one month 10 million new clocks started. For the sake of suspension of disbelief, please invent your own disease name)
