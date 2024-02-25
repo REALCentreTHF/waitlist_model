@@ -64,28 +64,23 @@ df_1 <- df_0 %>%
       TRUE ~ as.numeric(str_split(metric,'_',simplify=T)[,4]))) %>%
   tidyr::pivot_wider(.,names_from='rtt_part_description',values_from='values')  %>%
   # Make date: this is how many months since START DATE which is the first date in the dataset
-  dplyr::mutate(t=interval(min(df_0$date),date)%/% months(1)) %>%
+  dplyr::mutate(t=interval(min(df_0$date),date) %/% months(1)) %>%
   janitor::clean_names() %>%
   dplyr::mutate(
     completed = case_when(
-      i==-1 ~ 0L,
+      i== -1 ~ 0L,
       TRUE ~ completed_pathways_for_admitted_patients + completed_pathways_for_non_admitted_patients),
     open = case_when(
-      i==-1 ~ 0L,
+      i == -1 ~ 0L,
       TRUE ~ incomplete_pathways + incomplete_pathways_with_dta),
     new = new_rtt_periods_all_patients,
     i = case_when(i==-1 ~ 0,
                   TRUE ~ i%/%4)) %>%
   dplyr::group_by(i,t) %>%
-  # Create the three main fields we need
+  # Create the two main fields we need
   dplyr::summarise(
-    new= sum(new,na.rm=T),
-    open = sum(open,na.rm=T),
-    completed = sum(completed,na.rm=T)
-  ) %>%
-  # Added later - delete as needed.
-  dplyr::mutate(open = open+new) %>%
-  dplyr::select(!new)
+    open = sum(new,na.rm=T) + sum(open,na.rm=T),
+    completed = sum(completed,na.rm=T))
 
 # This is the lagged dataset: what the previous period data was.
 df_lagged <- df_1 %>%
@@ -104,33 +99,41 @@ df_2 <- df_1 %>%
   dplyr::left_join(.,df_lagged,by=c('i','t')) %>%
   dplyr::mutate(carried=lag_open-completed,
                 a=case_when(
-                  open/carried > 1 ~ 0.999,
-                  open/carried < 0.8 ~ 0.8,
+                  #Apply cap/collar
+                  open/carried > 1 ~ 1,
+                  open/carried < 0 ~ 1,
                   TRUE ~ open/carried)) %>%
-  dplyr::select(t,i,a,open,completed,lag_open,carried)
+  dplyr::select(t,i,a,open,completed)
 
 # Variables -----------
 
+# Fixed drop-off rates
 df_a <- df_2 %>%
   dplyr::group_by(i) %>%
-  dplyr::summarise(a = mean(a,na.rm=T)) %>%
-  dplyr::mutate(a = case_when(is.nan(a)==TRUE ~ 0.7,
-                              T ~ a))
+  dplyr::summarise(a = quantile(a,0.85,na.rm=T)) %>%
+  rbind(data.frame('i'=27,'a'=1)) %>%
+  dplyr::mutate(a = case_when(is.nan(a)==TRUE ~ 0.5,
+                              T ~ a),
+                i=i-1) %>%
+  dplyr::filter(i>=0)
 
+# Fixed capacity by year
 capacity <- df_1 %>%
   dplyr::group_by(t) %>%
   dplyr::summarise(capacity = sum(completed))
 
+# Fixed theta by year
 df_c <- df_1 %>%
   dplyr::group_by(i) %>%
-  dplyr::summarise(c=sum(completed,na.rm=T)/sum(open,na.rm=T))
+  dplyr::summarise(c=sum(completed,na.rm=T)/(sum(open,na.rm=T)+sum(completed,na.rm=T)))
 
+# Synthetic data of estimated flow over time with spike at t=3
 n <- median((df_2 %>% filter(i == 0))$open)
-stream <- data.frame('i'=-148:-1,'z'=(sample(900:1200,148)/1000)*n) %>%
-  dplyr::mutate(z = case_when(
-    i == -3 ~ n*4,
-    TRUE ~ z
-  ))
+stream <- data.frame('i'=-32:-1,'z'=(sample(900:1200,32)/1000)*n)
+#   %>%dplyr::mutate(z = case_when(
+#     i == -3 ~ n*4,
+#     TRUE ~ z
+#   ))
 
 #Create dataset; rbind to stream for test
 df_z <- df_2 %>%
@@ -141,29 +144,25 @@ df_z <- df_2 %>%
   dplyr::filter(i + t == 0 | t == 0) %>%
   dplyr::rename('z'=open)
 
-df_z <- df_2 %>%
+df_synth <- df_2 %>%
   dplyr::group_by(i) %>%
-  dplyr::mutate(open = as.numeric(open)) %>%
-  dplyr::filter(t==max(t)) %>%
+  dplyr::mutate(z = as.numeric(open)) %>%
+  dplyr::filter(t==0) %>%
   rbind(stream)
 
-# Capacity is defined as median 
-cap <- median(capacity$capacity)
+# Capacity is defined as min 
+cap <- min(capacity$capacity)
 
 # Output ----------------------------------------------------------
 
 # Just to test: for now a is set to 1: i.e: no dropoffs
-df_a['a'] <- 1
-
-#test
-WaitList(4,cap_el=cap,result=df_z,df_a=df_a,df_c=df_c)
-WaitTimes(1,cap_el=cap,result=df_z,df_a=df_a,df_c=df_c,breach=3)
+#df_a['a'] <- 0.90
 
 #period we want to look at
-t <- c(0:32)
+t <- c(1:32)
 
 #output for range
-FINAL_outcomes <-lapply(t,
+outcomes <-lapply(t,
                         WaitTimes,
                         cap_el=cap,
                         result=df_z,
@@ -171,7 +170,8 @@ FINAL_outcomes <-lapply(t,
                         df_c=df_c,
                         breach = 3) %>%
   rbindlist() %>%
-  tibble::rownames_to_column('t')
+  tibble::rownames_to_column('t') %>%
+  mutate(ratio = b/w)
 
 #Waitlist over time
 data<-sapply(t,
@@ -180,30 +180,12 @@ data<-sapply(t,
              result=df_z,
              df_a=df_a,
              df_c=df_c) %>%
-  rbindlist() %>%
-  mutate(flag = case_when(
-    t >= 3 & i == t-3 ~ 'Y',
-    TRUE ~ 'N'
-  ))
+  rbindlist()
 
 # Plots ----------------------------------------------------------
 
 thf<-'#dd0031'
 thf2 <- '#2a7979'
-
-ggplot()+
-  geom_line(data=FINAL_outcomes,aes(x=as.numeric(t),y=r),col=thf)+
-  scale_fill_manual(values=c('Y'=thf,'N'=thf2))+
-  theme_bw()+
-  xlab('Months from start')+
-  ylab('Average waiting times (weeks)')
-
-ggplot()+
-  geom_line(data=FINAL_outcomes,aes(x=as.numeric(t),y=b/w),col=thf)+
-  scale_fill_manual(values=c('Y'=thf,'N'=thf2))+
-  theme_bw()+
-  xlab('Months from start')+
-  ylab('Proportion of waitlist that are 18+ week breaches')
 
 p<- ggplot()+
   geom_col(data=data,aes(x=i,y=z/1000000))+
@@ -220,7 +202,7 @@ animate(p, renderer=gifski_renderer(loop=T))
 
 q<- ggplot()+
   geom_col(data=df_2,aes(x=i,y=open/1000000))+
-  gganimate::transition_time(t) +
+  gganimate::transition_time(as.integer(t)) +
   geom_vline(xintercept=3.5,linetype=2,lwd=1)+
   theme_bw()+
   scale_fill_manual(values=c('Y'=thf,'N'=thf2))+
@@ -230,4 +212,42 @@ q<- ggplot()+
   labs(title = "Month: {frame_time}")
 
 animate(q, renderer=gifski_renderer(loop=T))  
+
+test <- data %>% 
+  left_join(.,df_2 %>% select(i,t,open),by=c('i','t')) %>% 
+  mutate(val =(z/open)-1,
+         flag=case_when(val < 0 ~'Y',
+                        T ~ 'N'))
+
+p<- ggplot()+
+  geom_col(data=test,aes(x=i,y=val,fill=flag))+
+  gganimate::transition_time(as.integer(t)) +
+  theme_bw()+
+  scale_fill_manual(values=c('Y'=thf,'N'=thf2))+
+  xlab('Months waiting') +
+  ylab('% deviation from reality')+
+  theme(legend.position='none')+
+  labs(title = "Month: {frame_time}")
+
+animate(p, renderer=gifski_renderer(loop=T))  
+
+diagnostics <- data %>%
+  mutate(type = 'Test') %>%
+  rbind(df_2 %>% 
+          filter(i!=0) %>% 
+          select(!c(a,completed)) %>% 
+          rename('z'=open) %>% 
+          mutate(type = 'Real')) %>%
+  filter(t != 0)
+
+d<-ggplot()+
+  geom_col(data=diagnostics,aes(x=i,y=z,fill=type))+
+  gganimate::transition_time(as.integer(t)) +
+  facet_wrap(~type)+
+  theme_bw()+
+  scale_fill_manual(values=c('Real'=thf2,'Test'=thf))+
+  xlab('Months waiting') +
+  ylab('Total waiting (m)')+
+  theme(legend.position='none')+
+  labs(title = "Month: {frame_time}")
 

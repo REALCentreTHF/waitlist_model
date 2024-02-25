@@ -34,7 +34,7 @@ UnzipCSV <- function(files){
 #Function to output waitlist shape over time (by buckets of months waiting)
 WaitList <- function(x,cap_el,result,df_a,df_c){
   #Where j
-  for(j in 0:x){
+  for(j in 1:x){
     
     #cap i at 26
     result <- result %>%
@@ -44,12 +44,13 @@ WaitList <- function(x,cap_el,result,df_a,df_c){
       dplyr::summarise(z = sum(z,na.rm=T))
     
     #apply formula
-    result['z'][result$i>=0,] <- 
+    result['z'][result$i>=0,] <-
+      #first multiple everything by ta
+      (df_a['a']*
       #First term: z(i) * a(i)
-      (result['z'][result$i>=0,]*df_a['a']) - 
+      ((result['z'][result$i>=0,]) - 
       #second term: theta(i)*c
-      (result['z'][result$i>=0,]*df_c['c']*cap_el)/(sum(result['z'][result$i>=0,]*df_c['c']))
-    
+      (result['z'][result$i>=0,]*df_c['c']*cap_el)/(sum(result['z'][result$i>=0,]*df_c['c']))))
     if(j == x){result$i <- result$i}else{result$i <- result$i + 1}
   }
   return(
@@ -63,7 +64,7 @@ WaitList <- function(x,cap_el,result,df_a,df_c){
 #Returns wait times, wait list size, and percent breaches
 WaitTimes <- function(x,cap_el,result,breach,df_a,df_c){
   
-  for(j in 0:x){
+  for(j in 1:x){
     
     #cap i at 26
     result <- result %>%
@@ -72,15 +73,15 @@ WaitTimes <- function(x,cap_el,result,breach,df_a,df_c){
       dplyr::group_by(i) %>%
       dplyr::summarise(z = sum(z,na.rm=T))
     
-    #find capping function,
     #apply formula
-    result['z'][result$i>=0,] <- 
-      #First term: z(i) * a(i)
-      (result['z'][result$i>=0,]*df_a['a']) - 
-      #second term: theta(i)*c
-      (result['z'][result$i>=0,]*df_c['c']*cap_el)/(sum(result['z'][result$i>=0,]*df_c['c']))
-    
-    result$i <- result$i + 1
+    result['z'][result$i>=0,] <-
+      #first multiple everything by ta
+      (df_a['a']*
+         #First term: z(i) * a(i)
+         ((result['z'][result$i>=0,]) - 
+            #second term: theta(i)*c
+            (result['z'][result$i>=0,]*df_c['c']*cap_el)/(sum(result['z'][result$i>=0,]*df_c['c']))))
+    if(j == x){result$i <- result$i}else{result$i <- result$i + 1}
   }
   return(
     list(
@@ -89,6 +90,7 @@ WaitTimes <- function(x,cap_el,result,breach,df_a,df_c){
       #number of waiters
       w = sum(result['z'][result$i>=0,]),
       #average wait times (w)
-      r = (sum(result['z'][result$i<=25,]*c(0:26))*(4.33))/sum(result['z'][result$i<=25,])
+      r = (sum(result['z'][result$i<=25,]*c(1:26))*(4.33))/sum(result['z'][result$i<=25,])
     ))
 }
+
