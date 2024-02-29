@@ -31,7 +31,7 @@ specs <- c('C_999',
            'C_320',
            'C_140')
 
-spec_names <- read.csv('spec_names.csv')
+spec_names <- read.csv('const/spec_names.csv')
 
 # Raw RTT data -------------------------------------------------------------
 
