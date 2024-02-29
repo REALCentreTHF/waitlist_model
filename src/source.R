@@ -187,36 +187,39 @@ data<-sapply(t,
              result=df_z,
              df_a=df_a,
              df_c=df_c) %>%
-  rbindlist()
+  rbindlist() %>%
+  # In doing this, I incidentally discovered an issue in either
+  # base R or data.table...despite considering i as an integer,
+  # and even AFTER coercing it to an int, it still treats it
+  # as a float with a floating point error, which means it won't
+  # make it function properly in gganimate...so i've had to order it
+  # as a factor!
+  mutate(i = factor(as.character(i),
+                    levels = c('0',"1", "2", "3", "4", "5",
+                               "6", "7", "8", "9", "10",
+                               "11", "12", "13", "14", "15",
+                               "16", "17", "18", "19", "20",
+                               "21", "22", "23", "24", "25",'26')))
 
 # Plots ----------------------------------------------------------
 
 thf<-'#dd0031'
 thf2 <- '#2a7979'
 
-test <- data %>% filter(s == 'C_999') %>%
-  select(i,t,z)
-
-test2 <- test %>%
-  pivot_wider(names_from=t,values_from=z)
-
 ggplot()+
-  geom_line(data=test,aes(x=t,y=z,col=as.character(i)))
-
-ggplot()+
-  geom_col(data=test,aes(x=i,y=z/1000000),fill=thf)+
-  gganimate::transition_time(t) +
+  geom_col(data=try_this,aes(x=i,y=z/1000),fill=thf)+
+  gganimate::transition_time(t)+
   geom_vline(xintercept=3.5,linetype=2,lwd=1)+
   theme_bw()+
   xlab('Months waiting') +
-  ylab('Total waiting (m)')+
-  labs(title = "Month: {frame_time}") +
-  ease_aes('linear')
+  ylab('Total waiting (th)')+
+  theme(legend.position='none')+
+  labs(title = "Month: {frame_time}")
 
-animate(p, renderer=gifski_renderer(loop=T),nframes = 32)  
+animate(p, renderer=gifski_renderer(loop=T),nframes=100)  
 
 q<- ggplot()+
-  geom_col(data=df_2 %>% filter(s=='C_999'),aes(x=i,y=open/1000000))+
+  geom_col(data=data.table(df_2),aes(x=i,y=open/1000000))+
   gganimate::transition_time(as.integer(t)) +
   geom_vline(xintercept=3.5,linetype=2,lwd=1)+
   theme_bw()+

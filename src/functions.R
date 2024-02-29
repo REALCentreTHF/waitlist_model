@@ -54,7 +54,7 @@ WaitList <- function(x,cap_el,result,df_a,df_c){
     
     #Calc sum by group t, s
     result[,z_c := (z*c)]
-    result[i>=0,z_sum := sum(z_c),by =c('s')]
+    result[i>=0,z_sum := sum(z_c),by =c('s')] 
 
     #Apply formula
     result[i >= 0,
