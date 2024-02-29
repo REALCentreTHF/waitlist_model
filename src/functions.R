@@ -33,31 +33,43 @@ UnzipCSV <- function(files){
 
 #Function to output waitlist shape over time (by buckets of months waiting)
 WaitList <- function(x,cap_el,result,df_a,df_c){
+  
+  #Set as DT
+  data.table::setDT(result)
+  
   #Where j
   for(j in 1:x){
     
     #cap i at 26
-    result <- result %>%
-      dplyr::mutate(i = case_when(i > 26 ~ 26,
-                                  TRUE ~ i)) %>%
-      dplyr::group_by(i) %>%
-      dplyr::summarise(z = sum(z,na.rm=T))
+
+    result[i >= 26, i := 26]
+    result <- result[,.(z=sum(z)),by=c('i','s')]
     
-    #apply formula
-    result['z'][result$i>=0,] <-
-      #first multiple everything by ta
-      (df_a['a']*
-      #First term: z(i) * a(i)
-      ((result['z'][result$i>=0,]) - 
-      #second term: theta(i)*c
-      (result['z'][result$i>=0,]*df_c['c']*cap_el)/(sum(result['z'][result$i>=0,]*df_c['c']))))
-    if(j == x){result$i <- result$i}else{result$i <- result$i + 1}
+    #join on a
+    result[as.data.frame(df_a),on=c('i','s'), a:=a]
+    #join on c
+    result[as.data.frame(df_c),on=c('i','s'), c:=c]
+    #join on c
+    result[as.data.frame(cap),on=c('s'), cap:=cap]
+    
+    #Calc sum by group t, s
+    result[,z_c := (z*c)]
+    result[i>=0,z_sum := sum(z_c),by =c('s')]
+
+    #Apply formula
+    result[i >= 0,
+           z := a * ( z - ((z*c*cap) / (z_sum) ))]
+    
+    #Add time period
+    result[i >= 0,
+           t := j]
+    
+  if(j == x){result$i <- result$i}else{result$i <- result$i + 1}
   }
   return(
     list(
       #return list of elements
-      l = data.frame('i'=0:26,'z'=result['z'][result$i>=0,],t=x)
-      
+      l = result[i>=0]
     ))
 }
 
