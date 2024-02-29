@@ -14,6 +14,25 @@ library(gifski)
 
 source('src/functions.R')
 
+# Global variables -------------------------------------------------------------
+
+specs <- c('C_999',
+           'C_110',
+           'C_130',
+           'X02',
+           'C_502',
+           'C_120',
+           'C_100',
+           'X05',
+           'C_101',
+           'C_301',
+           'C_330',
+           'X04',
+           'C_320',
+           'C_140')
+
+spec_names <- read.csv('spec_names.csv')
+
 # Raw RTT data -------------------------------------------------------------
 
 #Urls for datasets (1:3 means it only gets the past 3 years)
@@ -42,27 +61,17 @@ df_0 <- lapply(rtt_data,
   #Bind everything together
   data.table::rbindlist()
 
-test <- df_0 %>%
-  filter(treatment_function_code=='C_999')%>%
-  select(date,rtt_part_description,starts_with('gt'),total_all) %>%
-  dplyr::group_by(date,rtt_part_description)%>%
-  dplyr::summarise_all(~sum(.x,na.rm=T)) %>%
-  tidyr::pivot_longer(cols=c(starts_with('gt'),total_all),names_to='metric',values_to='values') %>%
-  dplyr::mutate(
-    i = case_when(
-      metric == 'total_all' ~ 0 ,
-      metric == 'gt_104_weeks_sum_1' ~ 104,
-      TRUE ~ as.numeric(str_split(metric,'_',simplify=T)[,4]))) %>%
-  tidyr::pivot_wider(.,names_from='rtt_part_description',values_from='values') %>%
-  select(date,i,starts_with('Incomplete'),starts_with('New RTT')) %>%
-  mutate(im = i %/% 4,
-         open = `Incomplete Pathways` + `Incomplete Pathways with DTA`) %>%
-  select(i,im,date,open,`New RTT Periods - All Patients`)
-  
 # Wrangling ----------------------------------------------------------
  
 # Wrangle data together
 df_1 <- df_0 %>%
+  # Group smaller specialties together
+  dplyr::mutate(
+    treatment_function_code = case_when(
+      !treatment_function_code %in% specs ~ 'ZZZ',
+      TRUE ~ treatment_function_code
+    )
+  ) %>%
   dplyr::group_by(date,rtt_part_description,treatment_function_code)%>%
   dplyr::summarise_all(~sum(.x,na.rm=T)) %>%
   # This is a filter that includes ALL specialties. Remove and group by for spec split
@@ -96,10 +105,8 @@ df_1 <- df_0 %>%
   dplyr::group_by(i,t,s) %>%
   # Create the two main fields we need
   dplyr::summarise(
-    already_open = sum(new,na.rm=T),
-    new = sum(open,na.rm=T),
-    completed = sum(completed,na.rm=T)) %>%
-  dplyr::mutate(open = already_open + new)
+    open = sum(open,na.rm=T) + sum(new,na.rm=T),
+    completed = sum(completed,na.rm=T))
 
 # This is the lagged dataset: what the previous period data was.
 df_lagged <- df_1 %>%
@@ -129,8 +136,13 @@ df_2 <- df_1 %>%
 # Fixed drop-off rates
 df_a <- df_2 %>%
   dplyr::group_by(i,s) %>%
-  dplyr::summarise(a = quantile(a,0.85,na.rm=T)) %>%
-  rbind(data.frame('i'=27,'a'=1,'s'=unique(df_2$s))) %>%
+  dplyr::summarise(a = quantile(a,0.75,na.rm=T)) %>%
+  rbind(data.frame('i'=27,'a'=1,'s'=unique(df_2$s)),
+        df_2 %>%
+          dplyr::group_by(i,s) %>%
+          dplyr::summarise(a = quantile(a,0.85,na.rm=T)) %>% 
+          filter(i == 26) %>% 
+          mutate(i=27)) %>%
   dplyr::mutate(a = case_when(is.nan(a)==TRUE ~ 0.5,
                               T ~ a),
                 i=i-1) %>%
@@ -206,8 +218,8 @@ data<-sapply(t,
 thf<-'#dd0031'
 thf2 <- '#2a7979'
 
-ggplot()+
-  geom_col(data=try_this,aes(x=i,y=z/1000),fill=thf)+
+p<-ggplot()+
+  geom_col(data=data,aes(x=i,y=z/1000),fill=thf)+
   gganimate::transition_time(t)+
   geom_vline(xintercept=3.5,linetype=2,lwd=1)+
   theme_bw()+
@@ -216,7 +228,7 @@ ggplot()+
   theme(legend.position='none')+
   labs(title = "Month: {frame_time}")
 
-animate(p, renderer=gifski_renderer(loop=T),nframes=100)  
+animate(p, renderer=gifski_renderer(loop=T))  
 
 q<- ggplot()+
   geom_col(data=data.table(df_2),aes(x=i,y=open/1000000))+
@@ -271,3 +283,18 @@ d<-ggplot()+
   labs(title = "Month: {frame_time}")
 
 animate(d, renderer=gifski_renderer(loop=T),nframes=32,fps=3)  
+
+ggplot(data=data %>% 
+         group_by(i,s) %>% 
+         summarise(a = mean(a),c=mean(c)) %>%
+         left_join(.,spec_names,by=c('s'='treatment_function_code')))+
+  geom_line(aes(x=i,y=c,group=s,col=treatment_function_name),alpha=1) +
+  theme_bw()
+
+ggplot(data=data %>% 
+         group_by(i,s) %>% 
+         summarise(a = mean(a),c=mean(c)) %>%
+         left_join(.,spec_names,by=c('s'='treatment_function_code')))+
+  geom_line(aes(x=i,y=c,group=s,col=treatment_function_name),alpha=1) +
+  theme_bw()
+  
