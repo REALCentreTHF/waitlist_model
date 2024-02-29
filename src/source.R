@@ -194,18 +194,26 @@ data<-sapply(t,
 thf<-'#dd0031'
 thf2 <- '#2a7979'
 
-p<- ggplot()+
-  geom_col(data=data %>% filter(s == 'C_999'),aes(x=i,y=z/1000000))+
-  gganimate::transition_time(as.integer(t)) +
+test <- data %>% filter(s == 'C_999') %>%
+  select(i,t,z)
+
+test2 <- test %>%
+  pivot_wider(names_from=t,values_from=z)
+
+ggplot()+
+  geom_line(data=test,aes(x=t,y=z,col=as.character(i)))
+
+ggplot()+
+  geom_col(data=test,aes(x=i,y=z/1000000),fill=thf)+
+  gganimate::transition_time(t) +
   geom_vline(xintercept=3.5,linetype=2,lwd=1)+
   theme_bw()+
-  scale_fill_manual(values=c('Y'=thf,'N'=thf2))+
   xlab('Months waiting') +
   ylab('Total waiting (m)')+
-  theme(legend.position='none')+
-  labs(title = "Month: {frame_time}")
+  labs(title = "Month: {frame_time}") +
+  ease_aes('linear')
 
-animate(p, renderer=gifski_renderer(loop=T))  
+animate(p, renderer=gifski_renderer(loop=T),nframes = 32)  
 
 q<- ggplot()+
   geom_col(data=df_2 %>% filter(s=='C_999'),aes(x=i,y=open/1000000))+
@@ -221,31 +229,32 @@ q<- ggplot()+
 animate(q, renderer=gifski_renderer(loop=T))  
 
 test <- data %>% 
-  left_join(.,df_2 %>% select(i,t,open),by=c('i','t')) %>% 
-  mutate(val =(z/open)-1,
-         flag=case_when(val < 0 ~'Y',
-                        T ~ 'N'))
+  left_join(.,df_2 %>% select(i,t,s,open),by=c('i','s','t')) %>% 
+  mutate(val =(z-open)) %>%
+  filter(s == 'C_999') %>%
+  filter(i!=0)
 
 p<- ggplot()+
-  geom_col(data=test,aes(x=i,y=val,fill=flag))+
+  geom_col(data=test,aes(x=i,y=val))+
   gganimate::transition_time(as.integer(t)) +
   theme_bw()+
-  scale_fill_manual(values=c('Y'=thf,'N'=thf2))+
   xlab('Months waiting') +
   ylab('% deviation from reality')+
   theme(legend.position='none')+
   labs(title = "Month: {frame_time}")
 
-animate(p, renderer=gifski_renderer(loop=T))  
+animate(p, renderer=gifski_renderer(loop=T),nframes=32)  
 
 diagnostics <- data %>%
   mutate(type = 'Test') %>%
+  select(t,i,s,z,type) %>%
   rbind(df_2 %>% 
           filter(i!=0) %>% 
           select(!c(a,completed)) %>% 
           rename('z'=open) %>% 
           mutate(type = 'Real')) %>%
-  filter(t != 0)
+  filter(t != 0) %>% 
+  filter(s == 'C_100')
 
 d<-ggplot()+
   geom_col(data=diagnostics,aes(x=i,y=z,fill=type))+
@@ -258,3 +267,4 @@ d<-ggplot()+
   theme(legend.position='none')+
   labs(title = "Month: {frame_time}")
 
+animate(d, renderer=gifski_renderer(loop=T),nframes=32,fps=3)  

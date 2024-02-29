@@ -36,7 +36,7 @@ WaitList <- function(x,cap_el,result,df_a,df_c){
   
   #Set as DT
   data.table::setDT(result)
-  
+
   #Where j
   for(j in 1:x){
     
@@ -88,11 +88,16 @@ WaitTimes <- function(x,cap_el,result,breach,df_a,df_c){
     #apply formula
     result['z'][result$i>=0,] <-
       #first multiple everything by ta
-      (df_a['a']*
+      (
+        df_a['a']*
          #First term: z(i) * a(i)
-         ((result['z'][result$i>=0,]) - 
+         (
+           (result['z'][result$i>=0,]) - 
             #second term: theta(i)*c
-            (result['z'][result$i>=0,]*df_c['c']*cap_el)/(sum(result['z'][result$i>=0,]*df_c['c']))))
+            (result['z'][result$i>=0,]*df_c['c']*cap_el)/
+             (sum(result['z'][result$i>=0,]*df_c['c']))
+          )
+       )
     if(j == x){result$i <- result$i}else{result$i <- result$i + 1}
   }
   return(
