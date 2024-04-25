@@ -1,35 +1,11 @@
 # Functions -------
 
-#Gets links from any single url; string matches
-GetLinks <- function(url_name,string){
-  files <- c()
-  #this is inefficient and bad practice but it's a small vector.
-  for(i in seq_along(url_name)){
-    pg <- rvest::read_html(url_name[i])
-    pg<-(rvest::html_attr(rvest::html_nodes(pg, "a"), "href"))
-    files <- c(files,pg[grepl(string,pg)])
-    files <- files %>% unique()
-  }
-  return(files)
+#create grid
+CreateReferrals <- function(min_x,max_x,specialty,growth,starting_value){
+  expand_grid('t'=min_x:max_x,'s'=specialty) %>%
+    dplyr::mutate(open = (starting_value * (jitter(growth))^t)) %>%
+    dplyr::mutate(i = -t)
 }
-
-#Read all csvs from urls; unz for zips
-UnzipCSV <- function(files){
-  #creates temp file to read in the data
-  temp <- tempfile()
-  download.file(files,temp)
-  #This is needed because a zip file may have multiple files
-  file_names <- unzip(temp,list=T)$Name
-  data<- lapply(file_names,
-                function(x){
-                  da <- data.table::fread(unzip(temp,x))
-                  #janitor to clean unruly names
-                  names(da) <- names(da) %>% janitor::make_clean_names()  
-                  return(da)
-                })
-  #unlink the temp file, important to do
-  unlink(temp)
-  data}
 
 #Function to output waitlist shape over time (by buckets of months waiting)
 WaitList <- function(x,cap_el,result,df_a,df_c){
@@ -53,7 +29,7 @@ WaitList <- function(x,cap_el,result,df_a,df_c){
     result[as.data.frame(cap),on=c('s'), cap:=cap]
     
     #Calc sum by group t, s
-    result[,z_c := (z*c)]
+    result[i>=0,z_c := (z*c)]
     result[i>=0,z_sum := sum(z_c),by =c('s')] 
 
     #Apply formula
@@ -119,3 +95,8 @@ WaitTimes <- function(x,cap_el,result,breach,df_a,df_c){
     ))
 }
 
+CreateCapacity <- function(x,specialties,growth,base_capacity){
+  expand_grid(t=c(1:x),s=specialties) %>%
+    dplyr::left_join(base_capacity,by=c('s')) %>%
+    mutate(cap = cap_lq*(growth)^t)
+}

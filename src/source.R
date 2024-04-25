@@ -1,44 +1,14 @@
-#packages
-library(tidyverse)
-library (data.table)
-library(xml2)
-library(rvest)
-library(janitor)
-library(lubridate)
-library(purrr)
-library(performance)
-library(gganimate)
-library(gifski)
-
 # Source functions -------------------------------------------------------------
 
 source('src/functions.R')
-
-# Global variables -------------------------------------------------------------
-
-specs <- c('C_999',
-           'C_110',
-           'C_130',
-           'X02',
-           'C_502',
-           'C_120',
-           'C_100',
-           'X05',
-           'C_101',
-           'C_301',
-           'C_330',
-           'X04',
-           'C_320',
-           'C_140')
-
-spec_names <- read.csv('const/spec_names.csv')
+source('const/glob.R')
+source('https://raw.githubusercontent.com/zeyadissa/open_health_data/main/src/functions.R')
 
 # Raw RTT data -------------------------------------------------------------
 
 #Urls for datasets (1:3 means it only gets the past 3 years)
-rtt_link <- 'https://www.england.nhs.uk/statistics/statistical-work-areas/rtt-waiting-times/'
-rtt_urls <- GetLinks(rtt_link,'statistical-work-areas/rtt-waiting-times/rtt-data-')[c(1:3)]
 rtt_files <- GetLinks(rtt_urls,'Full-CSV-data')
+rtt_urls <- GetLinks(rtt_link,'statistical-work-areas/rtt-waiting-times/rtt-data-')[c(1:3)]
 
 #Apply function to all .zip links
 rtt_data <- sapply(rtt_files,
@@ -65,6 +35,7 @@ df_0 <- lapply(rtt_data,
  
 # Wrangle data together
 df_1 <- df_0 %>%
+  dplyr::filter(treatment_function_code %in% specs) %>%
   # Group smaller specialties together
   dplyr::mutate(
     treatment_function_code = case_when(
@@ -102,7 +73,7 @@ df_1 <- df_0 %>%
     new = new_rtt_periods_all_patients,
     i = i%/%4) %>%
   dplyr::rename('s'=treatment_function_code) %>%
-  dplyr::group_by(i,t,s) %>%
+  dplyr::group_by(i,t,s,date) %>%
   # Create the two main fields we need
   dplyr::summarise(
     open = sum(open,na.rm=T) + sum(new,na.rm=T),
@@ -115,7 +86,7 @@ df_lagged <- df_1 %>%
                             TRUE ~ i+1),
                 lagged_completed = completed,
                 lagged_open = open) %>%
-  dplyr::select(i,t,s,lagged_completed,lagged_open) %>%
+  dplyr::select(i,t,s,date,lagged_completed,lagged_open) %>%
   dplyr::group_by(i,t,s) %>%
   dplyr::summarise(lag_completed = sum(lagged_completed,na.rm=T),
                    lag_open = sum(lagged_open,na.rm=T))
@@ -131,13 +102,13 @@ df_2 <- df_1 %>%
                   TRUE ~ open/carried)) %>%
   dplyr::select(t,i,a,s,open,completed)
 
-# Variables -----------
-
 # Fixed drop-off rates
 df_a <- df_2 %>%
   dplyr::group_by(i,s) %>%
-  dplyr::summarise(a = quantile(a,0.75,na.rm=T)) %>%
-  rbind(data.frame('i'=27,'a'=1,'s'=unique(df_2$s)),
+  dplyr::summarise(a = quantile(a,0.85,na.rm=T)) %>%
+  #this is the mother of all evil: 
+  #the drop-off is intensely consequential.
+  rbind(data.frame('i'=27,'a'=0.98,'s'=unique(df_2$s)),
         df_2 %>%
           dplyr::group_by(i,s) %>%
           dplyr::summarise(a = quantile(a,0.85,na.rm=T)) %>% 
@@ -158,143 +129,11 @@ df_c <- df_1 %>%
   dplyr::group_by(i,s) %>%
   dplyr::summarise(c=sum(completed,na.rm=T)/(sum(open,na.rm=T)+sum(completed,na.rm=T)))
 
-#Create dataset; rbind to stream for test
-df_z <- df_2 %>%
-  #dplyr::group_by(i) %>%
-  dplyr::mutate(open = as.numeric(open),
-                i = case_when(i == 0 ~ i-t,
-                              TRUE ~ i))%>%
-  dplyr::filter(i + t == 0 | t == 0) %>%
-  dplyr::rename('z'=open) %>%
-  dplyr::select(!a)
-
 # Capacity is defined as min 
-cap <- capacity %>% group_by(s)%>%
-  summarise(cap=min(capacity))
 
-# Output ----------------------------------------------------------
+base_capacity <- capacity %>% 
+  group_by(s)%>%
+  summarise(cap_med=median(capacity),
+            cap_lq = quantile(capacity,0.25),
+            cap_uq = quantile(capacity,0.75))
 
-# Just to test: for now a is set to 1: i.e: no dropoffs
-#df_a['a'] <- 0.90
-
-#period we want to look at
-t <- c(1:32)
-
-#output for range
-outcomes <-lapply(t,
-                        WaitTimes,
-                        cap_el=cap,
-                        result=df_z,
-                        df_a=df_a,
-                        df_c=df_c,
-                        breach = 3) %>%
-  rbindlist() %>%
-  tibble::rownames_to_column('t') %>%
-  mutate(ratio = b/w)
-
-#Waitlist over time
-data<-sapply(t,
-             WaitList,
-             cap_el=cap,
-             result=df_z,
-             df_a=df_a,
-             df_c=df_c) %>%
-  rbindlist() %>%
-  # In doing this, I incidentally discovered an issue in either
-  # base R or data.table...despite considering i as an integer,
-  # and even AFTER coercing it to an int, it still treats it
-  # as a float with a floating point error, which means it won't
-  # make it function properly in gganimate...so i've had to order it
-  # as a factor!
-  mutate(i = factor(as.character(i),
-                    levels = c('0',"1", "2", "3", "4", "5",
-                               "6", "7", "8", "9", "10",
-                               "11", "12", "13", "14", "15",
-                               "16", "17", "18", "19", "20",
-                               "21", "22", "23", "24", "25",'26')))
-
-# Plots ----------------------------------------------------------
-
-thf<-'#dd0031'
-thf2 <- '#2a7979'
-
-p<-ggplot()+
-  geom_col(data=data,aes(x=i,y=z/1000),fill=thf)+
-  gganimate::transition_time(t)+
-  geom_vline(xintercept=3.5,linetype=2,lwd=1)+
-  theme_bw()+
-  xlab('Months waiting') +
-  ylab('Total waiting (th)')+
-  theme(legend.position='none')+
-  labs(title = "Month: {frame_time}")
-
-animate(p, renderer=gifski_renderer(loop=T))  
-
-q<- ggplot()+
-  geom_col(data=data.table(df_2),aes(x=i,y=open/1000000))+
-  gganimate::transition_time(as.integer(t)) +
-  geom_vline(xintercept=3.5,linetype=2,lwd=1)+
-  theme_bw()+
-  scale_fill_manual(values=c('Y'=thf,'N'=thf2))+
-  xlab('Months waiting') +
-  ylab('Total waiting (m)')+
-  theme(legend.position='none')+
-  labs(title = "Month: {frame_time}")
-
-animate(q, renderer=gifski_renderer(loop=T))  
-
-test <- data %>% 
-  left_join(.,df_2 %>% select(i,t,s,open),by=c('i','s','t')) %>% 
-  mutate(val =(z-open)) %>%
-  filter(s == 'C_999') %>%
-  filter(i!=0)
-
-p<- ggplot()+
-  geom_col(data=test,aes(x=i,y=val))+
-  gganimate::transition_time(as.integer(t)) +
-  theme_bw()+
-  xlab('Months waiting') +
-  ylab('% deviation from reality')+
-  theme(legend.position='none')+
-  labs(title = "Month: {frame_time}")
-
-animate(p, renderer=gifski_renderer(loop=T),nframes=32)  
-
-diagnostics <- data %>%
-  mutate(type = 'Test') %>%
-  select(t,i,s,z,type) %>%
-  rbind(df_2 %>% 
-          filter(i!=0) %>% 
-          select(!c(a,completed)) %>% 
-          rename('z'=open) %>% 
-          mutate(type = 'Real')) %>%
-  filter(t != 0) %>% 
-  filter(s == 'C_100')
-
-d<-ggplot()+
-  geom_col(data=diagnostics,aes(x=i,y=z,fill=type))+
-  gganimate::transition_time(as.integer(t)) +
-  facet_wrap(~type)+
-  theme_bw()+
-  scale_fill_manual(values=c('Real'=thf2,'Test'=thf))+
-  xlab('Months waiting') +
-  ylab('Total waiting (m)')+
-  theme(legend.position='none')+
-  labs(title = "Month: {frame_time}")
-
-animate(d, renderer=gifski_renderer(loop=T),nframes=32,fps=3)  
-
-ggplot(data=data %>% 
-         group_by(i,s) %>% 
-         summarise(a = mean(a),c=mean(c)) %>%
-         left_join(.,spec_names,by=c('s'='treatment_function_code')))+
-  geom_line(aes(x=i,y=c,group=s,col=treatment_function_name),alpha=1) +
-  theme_bw()
-
-ggplot(data=data %>% 
-         group_by(i,s) %>% 
-         summarise(a = mean(a),c=mean(c)) %>%
-         left_join(.,spec_names,by=c('s'='treatment_function_code')))+
-  geom_line(aes(x=i,y=c,group=s,col=treatment_function_name),alpha=1) +
-  theme_bw()
-  
