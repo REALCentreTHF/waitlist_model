@@ -19,3 +19,10 @@ specs <- 'C_999'
 spec_names <- data.table::fread('const/spec_names.csv')
 
 rtt_link <- 'https://www.england.nhs.uk/statistics/statistical-work-areas/rtt-waiting-times/'
+
+thf<-'#dd0031'
+
+thf2 <- '#2a7979'
+
+capacity_growth <- 1.00083
+referral_growth <- 1.001652

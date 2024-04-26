@@ -7,8 +7,8 @@ source('https://raw.githubusercontent.com/zeyadissa/open_health_data/main/src/fu
 # Raw RTT data -------------------------------------------------------------
 
 #Urls for datasets (1:3 means it only gets the past 3 years)
-rtt_files <- GetLinks(rtt_urls,'Full-CSV-data')
 rtt_urls <- GetLinks(rtt_link,'statistical-work-areas/rtt-waiting-times/rtt-data-')[c(1:3)]
+rtt_files <- GetLinks(rtt_urls,'Full-CSV-data')
 
 #Apply function to all .zip links
 rtt_data <- sapply(rtt_files,
@@ -59,7 +59,7 @@ df_1 <- df_0 %>%
     )) %>%
   dplyr::mutate(
     i = case_when(
-      metric == 'total_all' ~ 0 ,
+      metric == 'total_all' ~ 0,
       metric == 'gt_104_weeks_sum_1' ~ 104,
       TRUE ~ as.numeric(str_split(metric,'_',simplify=T)[,4]))) %>%
   tidyr::pivot_wider(.,names_from='rtt_part_description',values_from='values')  %>%
@@ -69,20 +69,20 @@ df_1 <- df_0 %>%
   # Sum up completed and incomplete pathways
   dplyr::mutate(
     completed = completed_pathways_for_admitted_patients + completed_pathways_for_non_admitted_patients,
-    open = incomplete_pathways + incomplete_pathways_with_dta,
+    open = incomplete_pathways,
     new = new_rtt_periods_all_patients,
-    i = i%/%4) %>%
+    i = i%/%4.33333) %>%
   dplyr::rename('s'=treatment_function_code) %>%
   dplyr::group_by(i,t,s,date) %>%
   # Create the two main fields we need
   dplyr::summarise(
-    open = sum(open,na.rm=T) + sum(new,na.rm=T),
+    open = sum(open,na.rm=T),
     completed = sum(completed,na.rm=T))
 
 # This is the lagged dataset: what the previous period data was.
 df_lagged <- df_1 %>%
   dplyr::mutate(t=t+1,
-                i=case_when(i==26 ~ 26,
+                i=case_when(i==24 ~ 24,
                             TRUE ~ i+1),
                 lagged_completed = completed,
                 lagged_open = open) %>%
@@ -105,35 +105,24 @@ df_2 <- df_1 %>%
 # Fixed drop-off rates
 df_a <- df_2 %>%
   dplyr::group_by(i,s) %>%
-  dplyr::summarise(a = quantile(a,0.85,na.rm=T)) %>%
+  dplyr::summarise(a = quantile(a,0.999,na.rm=T)) %>%
   #this is the mother of all evil: 
   #the drop-off is intensely consequential.
-  rbind(data.frame('i'=27,'a'=0.98,'s'=unique(df_2$s)),
-        df_2 %>%
-          dplyr::group_by(i,s) %>%
-          dplyr::summarise(a = quantile(a,0.85,na.rm=T)) %>% 
-          filter(i == 26) %>% 
-          mutate(i=27)) %>%
+  rbind(data.frame('i'=25,'a'=0.98,'s'=unique(df_2$s))) %>%
   dplyr::mutate(a = case_when(is.nan(a)==TRUE ~ 0.5,
                               T ~ a),
                 i=i-1) %>%
   dplyr::filter(i>=0)
 
 # Fixed capacity by year
-capacity <- df_1 %>%
+base_capacity <- df_1 %>%
   dplyr::group_by(t,s) %>%
-  dplyr::summarise(capacity = sum(completed))
+  dplyr::summarise(capacity = sum(completed)) %>%
+  group_by(s)%>%
+  summarise(cap = median(capacity))
 
 # Fixed theta by year
 df_c <- df_1 %>%
-  dplyr::group_by(i,s) %>%
-  dplyr::summarise(c=sum(completed,na.rm=T)/(sum(open,na.rm=T)+sum(completed,na.rm=T)))
-
-# Capacity is defined as min 
-
-base_capacity <- capacity %>% 
-  group_by(s)%>%
-  summarise(cap_med=median(capacity),
-            cap_lq = quantile(capacity,0.25),
-            cap_uq = quantile(capacity,0.75))
+  dplyr::mutate(c_a = completed/(open+completed))%>%
+  dplyr::group_by(i,s)
 

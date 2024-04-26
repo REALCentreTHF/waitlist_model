@@ -1,24 +1,29 @@
 # Functions -------
 
 #create grid
-CreateReferrals <- function(min_x,max_x,specialty,growth,starting_value){
+CreateReferrals <- function(min_x,max_x,specialty,growth,starting_value,jitter_factor){
   expand_grid('t'=min_x:max_x,'s'=specialty) %>%
-    dplyr::mutate(open = (starting_value * (jitter(growth))^t)) %>%
+    dplyr::mutate(open = jitter(starting_value * ((growth))^t,factor=jitter_factor)) %>%
     dplyr::mutate(i = -t)
-}
+} %>%
+  as.data.frame()
 
 #Function to output waitlist shape over time (by buckets of months waiting)
-WaitList <- function(x,cap_el,result,df_a,df_c){
+WaitList <- function(x,capacity,result,df_a,df_c){
   
   #Set as DT
   data.table::setDT(result)
-
+  data.table::setDT(capacity)
+  
+  #pre-allocate empty list of length x
+  final_data <- vector('list',x)
+  
   #Where j
   for(j in 1:x){
     
-    #cap i at 26
+    #cap i at 24
 
-    result[i >= 26, i := 26]
+    result[i >= 24, i := 24]
     result <- result[,.(z=sum(z)),by=c('i','s')]
     
     #join on a
@@ -26,77 +31,86 @@ WaitList <- function(x,cap_el,result,df_a,df_c){
     #join on c
     result[as.data.frame(df_c),on=c('i','s'), c:=c]
     #join on c
-    result[as.data.frame(cap),on=c('s'), cap:=cap]
+    result[capacity[t==j,],on=c('s'),cap:=cap]
     
     #Calc sum by group t, s
-    result[i>=0,z_c := (z*c)]
-    result[i>=0,z_sum := sum(z_c),by =c('s')] 
+    result[i>=0, z_c := (z*c)]
+    result[i>=0, z_sum := sum(z_c),by =c('s')] 
 
     #Apply formula
     result[i >= 0,
            z := a * ( z - ((z*c*cap) / (z_sum) ))]
     
     #Add time period
-    result[i >= 0,
+    result[i >= -1,
            t := j]
     
-  if(j == x){result$i <- result$i}else{result$i <- result$i + 1}
-  }
-  return(
-    list(
-      #return list of elements
-      l = result[i>=0]
-    ))
-}
-
-#Returns wait times, wait list size, and percent breaches
-WaitTimes <- function(x,cap_el,result,breach,df_a,df_c){
+    result$i <- result$i+1
   
-  #Set as DT
-  data.table::setDT(result)
-  
-  #Where j
-  for(j in 1:x){
-    
-    #cap i at 26
-    
-    result[i >= 26, i := 26]
-    result <- result[,.(z=sum(z)),by=c('i','s')]
-    
-    #join on a
-    result[as.data.frame(df_a),on=c('i','s'), a:=a]
-    #join on c
-    result[as.data.frame(df_c),on=c('i','s'), c:=c]
-    #join on c
-    result[as.data.frame(cap),on=c('s'), cap:=cap]
-    
-    #Calc sum by group t, s
-    result[,z_c := (z*c)]
-    result[i>=0,z_sum := sum(z_c),by =c('s')] 
-    
-    #Apply formula
-    result[i >= 0,
-           z := a * ( z - ((z*c*cap) / (z_sum) ))]
-    
-    #Add time period
-    result[i >= 0,
-           t := j]
-    
-    if(j == x){result$i <- result$i}else{result$i <- result$i + 1}
+    #allocate result appropriately
+    final_data[[j]] <- result[i>=0,]
   }
-  return(
-    list(
-      #number of breaches
-      b = sum(result['z'][result$i>=breach,]),
-      #number of waiters
-      w = sum(result['z'][result$i>=0,]),
-      #average wait times (w)
-      r = (sum(result['z'][result$i<=25,]*c(1:26))*(4.33))/sum(result['z'][result$i<=25,])
-    ))
+  #return func
+  return(final_data)
 }
 
 CreateCapacity <- function(x,specialties,growth,base_capacity){
   expand_grid(t=c(1:x),s=specialties) %>%
     dplyr::left_join(base_capacity,by=c('s')) %>%
-    mutate(cap = cap_lq*(growth)^t)
+    mutate(cap = cap*(growth)^t)
 }
+
+
+CreateData <- function(ref_growth,cap_growth,policy,jitter_factor,breach_limit){
+  
+  df_z_2 <- df_2 %>%
+    dplyr::ungroup()%>%
+    #position as at latest
+    dplyr::filter(t == max(t)) %>%
+    dplyr::mutate(t=0) %>%
+    select(t,s,open,i) %>%
+    add_row(
+      CreateReferrals(1,sim_time,
+                      specialty=specs,
+                      growth=ref_growth,
+                      starting_value=starting_average,
+                      jitter_factor=jitter_factor)
+    ) %>%
+    rename(z='open')
+  
+  capacity <- CreateCapacity(x=sim_time,
+                             specialties=specs,
+                             growth=cap_growth,
+                             base_capacity=base_capacity)
+  
+  df_c <- df_c %>%
+    dplyr::summarise(
+      c = quantile(c_a,policy,na.rm=T),
+    )
+  
+
+  #Waitlist over time
+  data<- WaitList(x = sim_time,
+                  capacity=capacity,
+                  result=df_z_2,
+                  df_a=df_a,
+                  df_c=df_c) %>%
+    data.table::rbindlist()
+
+  breaches <- data %>%
+    mutate(
+      breach_flag = case_when(
+        i > breach_limit ~ 'breach',
+        TRUE ~ 'not_breach')) %>%
+    ungroup()%>%
+    group_by(t,breach_flag) %>%
+    summarise(z = sum(z)) %>%
+    pivot_wider(values_from=z,names_from=breach_flag) %>%
+    mutate(tot = breach+not_breach)%>%
+    ungroup()
+  
+    
+  return(list(breaches=breaches,data=data))
+  
+}
+
