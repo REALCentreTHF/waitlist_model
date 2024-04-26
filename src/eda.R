@@ -1,6 +1,6 @@
 # Synthetic growth rates -----------
 
-sim_time <- 72
+sim_time <- 72+(5*12)
 
 growth_stream <- df_2 %>%
   dplyr::filter(i == 0) %>%
@@ -13,7 +13,7 @@ growth_stream <- df_2 %>%
   ) %>%
   drop_na()
 
-starting_average <- 1.5*1e6
+starting_average <- 1415241
 
 # checks ----------------------------------------------------------
 
@@ -37,35 +37,35 @@ df_a['a'] <- 0.98
 
 
 baseline <- CreateData(ref_growth = referral_growth,
-                       cap_growth = 1.001652,
+                       cap_growth = referral_growth,
                        policy = 0.5,
                        breach_limit = 4,
-                       jitter_factor = 0)$breaches %>%
+                       jitter_factor = 0) %>%
   add_row(
     old_data %>% filter(t == 0))
 
 baseline_shocks <- CreateData(ref_growth = referral_growth,
-                       cap_growth = 1.001652,
+                       cap_growth = referral_growth,
                        policy = 0.5,
                        breach_limit = 4,
-                       jitter_factor = 100)$breaches %>%
+                       jitter_factor = 100) %>%
   add_row(
     old_data %>% filter(t == 0))
 
 
 ideal <- CreateData(ref_growth = referral_growth,
-                       cap_growth = 1.002478,
+                       cap_growth = capacity_growth,
                        policy = 0.5,
                        breach_limit = 4,
-                       jitter_factor = 0)$breaches %>%
+                       jitter_factor = 0) %>%
   add_row(
     old_data %>% filter(t == 0))
 
 ideal_shocks <- CreateData(ref_growth = referral_growth,
-                              cap_growth = 1.002478,
+                              cap_growth = capacity_growth,
                               policy = 0.5,
                               breach_limit = 4,
-                              jitter_factor = 100)$breaches %>%
+                              jitter_factor = 100) %>%
   add_row(
     old_data %>% filter(t == 0))
 
@@ -85,11 +85,32 @@ ggplot() +
 
 ggplot() +
   geom_line(data=old_data,aes(x=t,y=breach/1e6),linetype=1)+
-  geom_line(data=baseline,aes(x=t,y=breach/1e6),linetype=2,col=thf)+
+  geom_line(data=baseline,aes(x=t,y
+                              =breach/1e6),linetype=2,col=thf)+
   geom_line(data=baseline_shocks,aes(x=t,y=breach/1e6),linetype=1,col=thf)+
   geom_line(data=ideal,aes(x=t,y=breach/1e6),linetype=2,col=thf2)+
   geom_line(data=ideal_shocks,aes(x=t,y=breach/1e6),linetype=1,col=thf2)+
   geom_vline(xintercept = 0,col='gray')+
+  theme_bw() +
+  xlab('Months from present') +
+  ylab('Number of over 18-week waits (mn)')
+
+ggplot() +
+  geom_line(data=old_data,aes(x=t,y=breach/not_breach),linetype=1)+
+  geom_line(data=baseline,aes(x=t,y=breach/not_breach),linetype=2,col=thf)+
+  geom_line(data=baseline_shocks,aes(x=t,y=breach/not_breach),linetype=1,col=thf)+
+  geom_line(data=ideal,aes(x=t,y=breach/not_breach),linetype=2,col=thf2)+
+  geom_line(data=ideal_shocks,aes(x=t,y=breach/not_breach),linetype=1,col=thf2)+
+  geom_vline(xintercept = 0,col='gray')+
+  theme_bw() +
+  xlab('Months from present') +
+  ylab('Number of over 18-week waits (mn)')
+
+
+ggplot() +
+  geom_col(data=old_data,aes(x=t,y=breach/(not_breach+breach)),linetype=1)+
+  geom_col(data=baseline_shocks,aes(x=t,y=breach/(not_breach+breach)),fill=thf)+
+  geom_line(data=baseline,aes(x=t,y=breach/(not_breach+breach)),col='black',linetype=2)+
   theme_bw() +
   xlab('Months from present') +
   ylab('Number of over 18-week waits (mn)')

@@ -64,7 +64,7 @@ df_1 <- df_0 %>%
       TRUE ~ as.numeric(str_split(metric,'_',simplify=T)[,4]))) %>%
   tidyr::pivot_wider(.,names_from='rtt_part_description',values_from='values')  %>%
   # Make date: this is how many months since START DATE which is the first date in the dataset
-  dplyr::mutate(t=interval(min(df_0$date),date) %/% months(1)) %>%
+  dplyr::mutate(t=lubridate::interval(min(df_0$date),date) %/% months(1)) %>%
   janitor::clean_names() %>%
   # Sum up completed and incomplete pathways
   dplyr::mutate(
@@ -119,7 +119,7 @@ base_capacity <- df_1 %>%
   dplyr::group_by(t,s) %>%
   dplyr::summarise(capacity = sum(completed)) %>%
   group_by(s)%>%
-  summarise(cap = median(capacity))
+  summarise(cap = quantile(capacity,0.25))
 
 # Fixed theta by year
 df_c <- df_1 %>%

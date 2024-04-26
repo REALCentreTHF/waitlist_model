@@ -1,3 +1,4 @@
+
 # Functions -------
 
 #create grid
@@ -110,7 +111,7 @@ CreateData <- function(ref_growth,cap_growth,policy,jitter_factor,breach_limit){
     ungroup()
   
     
-  return(list(breaches=breaches,data=data))
+  return(breaches)
   
 }
 
