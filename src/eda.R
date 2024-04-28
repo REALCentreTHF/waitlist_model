@@ -1,19 +1,19 @@
 # Synthetic growth rates -----------
 
+source('src/source.R')
+
+### EDA
+
 sim_time <- 72+(5*12)
 
-growth_stream <- df_2 %>%
-  dplyr::filter(i == 0) %>%
+growth_stream <- df_1 %>%
+  dplyr::filter(new != 0) %>%
   dplyr::ungroup()%>%
-  dplyr::select(t,open,s) %>%
+  dplyr::select(t,new,s) %>%
   dplyr::arrange(t) %>%
-  group_by(s) %>%
-  dplyr::mutate(
-    g = (open - lag(open))/lag(open)
-  ) %>%
   drop_na()
 
-starting_average <- 1415241
+starting_average <- growth_stream$new %>% median
 
 # checks ----------------------------------------------------------
 
@@ -32,85 +32,104 @@ old_data <- df_2 %>%
     mutate(tot=breach+not_breach)%>%
   ungroup()
 
-
-df_a['a'] <- 0.98
-
-
-baseline <- CreateData(ref_growth = referral_growth,
-                       cap_growth = referral_growth,
-                       policy = 0.5,
-                       breach_limit = 4,
-                       jitter_factor = 0) %>%
-  add_row(
-    old_data %>% filter(t == 0))
-
-baseline_shocks <- CreateData(ref_growth = referral_growth,
-                       cap_growth = referral_growth,
-                       policy = 0.5,
-                       breach_limit = 4,
-                       jitter_factor = 100) %>%
-  add_row(
-    old_data %>% filter(t == 0))
+### calculations
 
 
-ideal <- CreateData(ref_growth = referral_growth,
-                       cap_growth = capacity_growth,
-                       policy = 0.5,
-                       breach_limit = 4,
-                       jitter_factor = 0) %>%
-  add_row(
-    old_data %>% filter(t == 0))
-
-ideal_shocks <- CreateData(ref_growth = referral_growth,
+baseline_jitter <- CreateData(df_data = df_2,
+                              ref_growth = referral_growth,
                               cap_growth = capacity_growth,
                               policy = 0.5,
                               breach_limit = 4,
-                              jitter_factor = 100) %>%
+                              jitter_factor = 100,
+                              a_lim = 0.75)$breaches %>%
   add_row(
     old_data %>% filter(t == 0))
 
-### Outputs -----
 
-ggplot() +
+baseline <- CreateData(df_data = df_2,
+                       ref_growth = referral_growth,
+                       cap_growth = capacity_growth,
+                       policy = 0.5,
+                       breach_limit = 4,
+                       jitter_factor = 0,
+                       a_lim = 0.75)$breaches %>%
+  add_row(
+    old_data %>% filter(t == 0))
+
+### best case scenario
+ideal_jitter <- CreateData(df_data = df_2,
+                              ref_growth = referral_growth,
+                              cap_growth = (1.03^(1/12)),
+                              policy = 0.5,
+                              breach_limit = 4,
+                              jitter_factor = 100,
+                              a_lim = 0.75)$breaches %>%
+  add_row(
+    old_data %>% filter(t == 0))
+
+
+ideal <- CreateData(df_data = df_2,
+                       ref_growth = referral_growth,
+                       cap_growth = (1.03^(1/12)),
+                       policy = 0.5,
+                       breach_limit = 4,
+                       jitter_factor = 0,
+                       a_lim = 0.75)$breaches %>%
+  add_row(
+    old_data %>% filter(t == 0))
+
+waitlist_plot <- ggplot() +
   geom_line(data=old_data,aes(x=t,y=tot/1e6),linetype=1)+
   geom_line(data=baseline,aes(x=t,y=tot/1e6),linetype=2,col=thf)+
-  geom_line(data=baseline_shocks,aes(x=t,y=tot/1e6),linetype=1,col=thf)+
+  geom_line(data=baseline_jitter,aes(x=t,y=tot/1e6),linetype=1,col=thf)+
   geom_line(data=ideal,aes(x=t,y=tot/1e6),linetype=2,col=thf2)+
-  geom_line(data=ideal_shocks,aes(x=t,y=tot/1e6),linetype=1,col=thf2)+
+  geom_line(data=ideal_jitter,aes(x=t,y=tot/1e6),linetype=1,col=thf2)+
   geom_vline(xintercept = 0,col='gray')+
   theme_bw() +
   xlab('Months from present') +
   ylab('Number of open RTT pathways (mn)')
 
-
-ggplot() +
-  geom_line(data=old_data,aes(x=t,y=breach/1e6),linetype=1)+
-  geom_line(data=baseline,aes(x=t,y
-                              =breach/1e6),linetype=2,col=thf)+
-  geom_line(data=baseline_shocks,aes(x=t,y=breach/1e6),linetype=1,col=thf)+
-  geom_line(data=ideal,aes(x=t,y=breach/1e6),linetype=2,col=thf2)+
-  geom_line(data=ideal_shocks,aes(x=t,y=breach/1e6),linetype=1,col=thf2)+
+breach_plot <- ggplot() +
+  geom_line(data=old_data,aes(x=t,y=(breach/(tot))),linetype=1)+
+  geom_line(data=baseline,aes(x=t,y=(breach/(tot))),linetype=2,col=thf)+
+  geom_line(data=baseline_jitter,aes(x=t,y=(breach/(tot))),linetype=1,col=thf)+
+  geom_line(data=ideal,aes(x=t,y=(breach/(tot))),linetype=2,col=thf2)+
+  geom_line(data=ideal_jitter,aes(x=t,y=(breach/(tot))),linetype=1,col=thf2)+
   geom_vline(xintercept = 0,col='gray')+
   theme_bw() +
   xlab('Months from present') +
-  ylab('Number of over 18-week waits (mn)')
+  ylab('Proportion of 18w breaches') +
+  scale_y_continuous(labels = scales::percent)
+  
 
-ggplot() +
-  geom_line(data=old_data,aes(x=t,y=breach/not_breach),linetype=1)+
-  geom_line(data=baseline,aes(x=t,y=breach/not_breach),linetype=2,col=thf)+
-  geom_line(data=baseline_shocks,aes(x=t,y=breach/not_breach),linetype=1,col=thf)+
-  geom_line(data=ideal,aes(x=t,y=breach/not_breach),linetype=2,col=thf2)+
-  geom_line(data=ideal_shocks,aes(x=t,y=breach/not_breach),linetype=1,col=thf2)+
-  geom_vline(xintercept = 0,col='gray')+
-  theme_bw() +
-  xlab('Months from present') +
-  ylab('Number of over 18-week waits (mn)')
+## costs:
 
+capacity_baseline <- CreateData(df_data = df_2,
+                       ref_growth = referral_growth,
+                       cap_growth = capacity_growth,
+                       policy = 0.5,
+                       breach_limit = 4,
+                       jitter_factor = 0,
+                       a_lim = 0.75)$capacity %>%
+  mutate(
+    first = cap,
+    fups = costs$fup_ratio * cap,
+    dc = costs$admit_ratio * costs$daycase_ratio * cap,
+    ord = costs$admit_ratio * costs$ordinary_ratio * cap) %>%
+  select(!cap) %>%
+  mutate(date = max(df_1$date) + months(t))
 
-ggplot() +
-  geom_col(data=old_data,aes(x=t,y=breach/(not_breach+breach)),linetype=1)+
-  geom_col(data=baseline_shocks,aes(x=t,y=breach/(not_breach+breach)),fill=thf)+
-  geom_line(data=baseline,aes(x=t,y=breach/(not_breach+breach)),col='black',linetype=2)+
-  theme_bw() +
-  xlab('Months from present') +
-  ylab('Number of over 18-week waits (mn)')
+capacity_ideal <- CreateData(df_data = df_2,
+                                ref_growth = referral_growth,
+                                cap_growth = (1.03^(1/12)),
+                                policy = 0.5,
+                                breach_limit = 4,
+                                jitter_factor = 0,
+                                a_lim = 0.75)$capacity %>%
+  mutate(
+    first = cap,
+    fups = costs$fup_ratio * cap,
+    dc = costs$admit_ratio * costs$daycase_ratio * cap,
+    ord = costs$admit_ratio * costs$ordinary_ratio * cap) %>%
+  select(!cap) %>%
+  mutate(date = max(df_1$date) + months(t))

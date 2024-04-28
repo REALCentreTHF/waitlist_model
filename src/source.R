@@ -39,7 +39,7 @@ df_1 <- df_0 %>%
   # Group smaller specialties together
   dplyr::mutate(
     treatment_function_code = case_when(
-      !treatment_function_code %in% specs ~ 'ZZZ',
+      !treatment_function_code %in% glob_specs ~ 'ZZZ',
       TRUE ~ treatment_function_code
     )
   ) %>%
@@ -52,63 +52,64 @@ df_1 <- df_0 %>%
   # everything, but crucially also only field that has the new rtt periods
   # so we just add it as -1 then turn it back.
   dplyr::ungroup() %>%
-  dplyr::mutate(
-    values = case_when(
-      metric == 'total_all' & rtt_part_description != 'New RTT Periods - All Patients' ~ 0,
-      TRUE ~ values
-    )) %>%
+  mutate(values = case_when(
+    metric == 'total_all' & rtt_part_description != 'New RTT Periods - All Patients' ~ 0,
+    T ~ values
+  )) %>%
+  dplyr::filter(metric != 'New RTT Periods - All Patients') %>%
   dplyr::mutate(
     i = case_when(
-      metric == 'total_all' ~ 0,
       metric == 'gt_104_weeks_sum_1' ~ 104,
       TRUE ~ as.numeric(str_split(metric,'_',simplify=T)[,4]))) %>%
   tidyr::pivot_wider(.,names_from='rtt_part_description',values_from='values')  %>%
   # Make date: this is how many months since START DATE which is the first date in the dataset
   dplyr::mutate(t=lubridate::interval(min(df_0$date),date) %/% months(1)) %>%
   janitor::clean_names() %>%
+  #filter(metric != 'total_all') %>%
   # Sum up completed and incomplete pathways
   dplyr::mutate(
     completed = completed_pathways_for_admitted_patients + completed_pathways_for_non_admitted_patients,
     open = incomplete_pathways,
     new = new_rtt_periods_all_patients,
-    i = i%/%4.33333) %>%
+    #convert week to month
+    i = i%/%4) %>%
   dplyr::rename('s'=treatment_function_code) %>%
   dplyr::group_by(i,t,s,date) %>%
   # Create the two main fields we need
   dplyr::summarise(
     open = sum(open,na.rm=T),
-    completed = sum(completed,na.rm=T))
+    completed = sum(completed,na.rm=T),
+    new = sum(new,na.rm=T))
 
 # This is the lagged dataset: what the previous period data was.
 df_lagged <- df_1 %>%
   dplyr::mutate(t=t+1,
-                i=case_when(i==24 ~ 24,
+                i=case_when(i>=26 ~ 26,
                             TRUE ~ i+1),
                 lagged_completed = completed,
                 lagged_open = open) %>%
   dplyr::select(i,t,s,date,lagged_completed,lagged_open) %>%
   dplyr::group_by(i,t,s) %>%
-  dplyr::summarise(lag_completed = sum(lagged_completed,na.rm=T),
-                   lag_open = sum(lagged_open,na.rm=T))
+  dplyr::summarise(lag_open = sum(lagged_open,na.rm=T))
 
 # This is the final dataset
 df_2 <- df_1 %>%
   dplyr::left_join(.,df_lagged,by=c('i','t','s')) %>%
-  dplyr::mutate(carried=lag_open-completed,
+  dplyr::mutate(carried=lag_open-completed+new,
                 a=case_when(
                   #Apply cap/collar
                   open/carried > 1 ~ 1,
                   open/carried < 0 ~ 1,
                   TRUE ~ open/carried)) %>%
-  dplyr::select(t,i,a,s,open,completed)
+  dplyr::select(t,i,a,s,open,completed,carried)
 
 # Fixed drop-off rates
 df_a <- df_2 %>%
   dplyr::group_by(i,s) %>%
-  dplyr::summarise(a = quantile(a,0.999,na.rm=T)) %>%
+  dplyr::summarise(a = quantile(a,0.5,na.rm=T)) %>%
   #this is the mother of all evil: 
   #the drop-off is intensely consequential.
-  rbind(data.frame('i'=25,'a'=0.98,'s'=unique(df_2$s))) %>%
+  rbind(data.frame('i'=27,'a'=0.97,'s'=unique(df_2$s))) %>%
   dplyr::mutate(a = case_when(is.nan(a)==TRUE ~ 0.5,
                               T ~ a),
                 i=i-1) %>%
@@ -119,10 +120,10 @@ base_capacity <- df_1 %>%
   dplyr::group_by(t,s) %>%
   dplyr::summarise(capacity = sum(completed)) %>%
   group_by(s)%>%
-  summarise(cap = quantile(capacity,0.25))
+  summarise(cap = quantile(capacity,0.75))
 
 # Fixed theta by year
-df_c <- df_1 %>%
+df_c <- df_2 %>%
   dplyr::mutate(c_a = completed/(open+completed))%>%
   dplyr::group_by(i,s)
 
