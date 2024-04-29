@@ -64,7 +64,6 @@ CreateCapacity <- function(x,specialties,growth,base_capacity){
     mutate(cap = cap*(growth)^t)
 }
 
-
 CreateData <- function(df_data,ref_growth,cap_growth,policy,jitter_factor,breach_limit,a_lim){
   
   df_z_2 <- df_data %>%
@@ -108,7 +107,6 @@ CreateData <- function(df_data,ref_growth,cap_growth,policy,jitter_factor,breach
       c = quantile(c_a,policy,na.rm=T),
     )
   
-
   #Waitlist over time
   data<- WaitList(x = sim_time,
                   capacity=capacity,
@@ -133,3 +131,63 @@ CreateData <- function(df_data,ref_growth,cap_growth,policy,jitter_factor,breach
   
 }
 
+#Function to output waitlist shape over time (by buckets of months waiting)
+WaitList <- function(x,capacity,result,df_a,df_c){
+  
+  #Set as DT
+  data.table::setDT(result)
+  data.table::setDT(capacity)
+  
+  #pre-allocate empty list of length x
+  final_data <- vector('list',x)
+  
+  #Where j
+  for(j in 1:x){
+    
+    #cap i at 24
+    
+    result[i >= 24, i := 24]
+    result <- result[,.(z=sum(z)),by=c('i','s')]
+    
+    #join on a
+    result[as.data.frame(df_a),on=c('i','s'), a:=a]
+    #join on c
+    result[as.data.frame(df_c),on=c('i','s'), c:=c]
+    #join on c
+    result[capacity[t==j,],on=c('s'),cap:=cap]
+    
+    #Calc sum by group t, s
+    result[i>=0, z_c := (z*c)]
+    result[i>=0, z_sum := sum(z_c),by =c('s')] 
+    
+    result[i >= 0,
+           d := ((z*c*cap) / (z_sum)) ]
+    
+    #Apply formula
+    result[i >= 0,
+           z := a * ( z - d ) ]
+    
+    #Add time period
+    result[i >= -1,
+           t := j]
+    
+    result$i <- result$i+1
+    
+    #allocate result appropriately
+    final_data[[j]] <- result[i>=0,]
+    
+    test <- (final_data %>%
+      dplyr::filter(t == sim_time) %>%
+      dplyr::mutate(
+        breach_flag = case_when(
+          i > 4 ~ 'breach',
+          TRUE ~ 'not_breach')) %>%
+      group_by(breach_flag) %>%
+      summarise(z = sum(z,na.rm=T)) %>%
+      pivot_wider(values_from=z,names_from=breach_flag) %>%
+      mutate(goal = (breach)/(not_breach+breach)))$goal
+    
+  }
+  #return func
+  return(final_data)
+}

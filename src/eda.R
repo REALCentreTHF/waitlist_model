@@ -1,6 +1,7 @@
 # Synthetic growth rates -----------
 
 source('src/source.R')
+source('const/glob.R')
 
 ### EDA
 
@@ -59,7 +60,7 @@ baseline <- CreateData(df_data = df_2,
 ### best case scenario
 ideal_jitter <- CreateData(df_data = df_2,
                               ref_growth = referral_growth,
-                              cap_growth = (1.03^(1/12)),
+                              cap_growth = (1.032^(1/12)),
                               policy = 0.5,
                               breach_limit = 4,
                               jitter_factor = 100,
@@ -70,7 +71,7 @@ ideal_jitter <- CreateData(df_data = df_2,
 
 ideal <- CreateData(df_data = df_2,
                        ref_growth = referral_growth,
-                       cap_growth = (1.03^(1/12)),
+                       cap_growth = (1.032^(1/12)),
                        policy = 0.5,
                        breach_limit = 4,
                        jitter_factor = 0,
@@ -133,3 +134,44 @@ capacity_ideal <- CreateData(df_data = df_2,
     ord = costs$admit_ratio * costs$ordinary_ratio * cap) %>%
   select(!cap) %>%
   mutate(date = max(df_1$date) + months(t))
+
+##
+
+goals <- expand_grid(
+  'ref_growth' = c(-20:20/100),
+  'cap_growth' = c(-20:20/100)
+) %>%
+  dplyr::rowwise()%>%
+  mutate(
+    goal = CreateGoals(
+      df_data = df_2,
+      ref_growth = ref_growth,
+      cap_growth = cap_growth,
+      policy = 0.5,
+      breach_limit = 4,
+      jitter_factor = 0,
+      a_lim = 0.75
+    )
+  )
+
+goals_limit <- expand_grid(
+  'ref_growth' = (1+c(0,0.01,0.02,0.03,0.04,0.05))^(1/12),
+  'cap_growth' = (1+c(-100:100/1000))^(1/12)
+) %>%
+  dplyr::rowwise()%>%
+  mutate(
+    goal = CreateGoals(
+      df_data = df_2,
+      ref_growth = ref_growth,
+      cap_growth = cap_growth,
+      policy = 0.5,
+      breach_limit = 4,
+      jitter_factor = 0,
+      a_lim = 0.75
+    )
+  )
+  
+write.csv(goals,'output/goals.csv')
+
+ggplot()+
+  geom_function()
