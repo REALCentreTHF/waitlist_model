@@ -1,7 +1,10 @@
 # Synthetic growth rates -----------
 
-source('src/source.R')
 source('const/glob.R')
+source('src/functions.R')
+
+df_1 <- read.csv('output/df_1.csv')
+df_2 <- read.csv('output/df_2.csv')
 
 ### EDA
 
@@ -19,19 +22,17 @@ starting_average <- growth_stream$new %>% median
 # checks ----------------------------------------------------------
 
 old_data <- df_2 %>%
-  mutate(t=t-34)%>%
-  mutate(z =  open)%>%
-  select(i,s,z,t) %>%
-  mutate(
-      breach_flag = case_when(
+  dplyr::mutate(t=t-34,
+                z =  open)%>%
+  dplyr::mutate(
+      breach_flag = dplyr::case_when(
         i > 4 ~ 'breach',
         TRUE ~ 'not_breach')) %>%
-    ungroup()%>%
-    group_by(t,breach_flag) %>%
-    summarise(z=sum(z)) %>%
-    pivot_wider(values_from=z,names_from=breach_flag) %>%
-    mutate(tot=breach+not_breach)%>%
-  ungroup()
+  dplyr::group_by(t,breach_flag) %>%
+  dplyr::summarise(z=sum(z)) %>%
+  tidyr::pivot_wider(values_from=z,names_from=breach_flag) %>%
+  dplyr::mutate(tot=breach+not_breach) %>%
+  dplyr::ungroup()
 
 ### calculations
 
@@ -81,10 +82,10 @@ ideal <- CreateData(df_data = df_2,
 
 waitlist_plot <- ggplot() +
   geom_line(data=old_data,aes(x=t,y=tot/1e6),linetype=1)+
-  geom_line(data=baseline,aes(x=t,y=tot/1e6),linetype=2,col=thf)+
-  geom_line(data=baseline_jitter,aes(x=t,y=tot/1e6),linetype=1,col=thf)+
-  geom_line(data=ideal,aes(x=t,y=tot/1e6),linetype=2,col=thf2)+
-  geom_line(data=ideal_jitter,aes(x=t,y=tot/1e6),linetype=1,col=thf2)+
+  geom_line(data=baseline,aes(x=t,y=tot/1e6),linetype=1,col=thf)+
+  geom_line(data=baseline_jitter,aes(x=t,y=tot/1e6),linetype=2,col=thf)+
+  geom_line(data=ideal,aes(x=t,y=tot/1e6),linetype=1,col=thf2)+
+  geom_line(data=ideal_jitter,aes(x=t,y=tot/1e6),linetype=2,col=thf2)+
   geom_vline(xintercept = 0,col='gray')+
   theme_bw() +
   xlab('Months from present') +
@@ -92,16 +93,18 @@ waitlist_plot <- ggplot() +
 
 breach_plot <- ggplot() +
   geom_line(data=old_data,aes(x=t,y=(breach/(tot))),linetype=1)+
-  geom_line(data=baseline,aes(x=t,y=(breach/(tot))),linetype=2,col=thf)+
-  geom_line(data=baseline_jitter,aes(x=t,y=(breach/(tot))),linetype=1,col=thf)+
-  geom_line(data=ideal,aes(x=t,y=(breach/(tot))),linetype=2,col=thf2)+
-  geom_line(data=ideal_jitter,aes(x=t,y=(breach/(tot))),linetype=1,col=thf2)+
+  geom_line(data=baseline,aes(x=t,y=(breach/(tot))),linetype=1,col=thf)+
+  geom_line(data=baseline_jitter,aes(x=t,y=(breach/(tot))),linetype=2,col=thf)+
+  geom_line(data=ideal,aes(x=t,y=(breach/(tot))),linetype=1,col=thf2)+
+  geom_line(data=ideal_jitter,aes(x=t,y=(breach/(tot))),linetype=2,col=thf2)+
   geom_vline(xintercept = 0,col='gray')+
   theme_bw() +
   xlab('Months from present') +
   ylab('Proportion of 18w breaches') +
   scale_y_continuous(labels = scales::percent)
   
+ggsave(filename='output/breach_plot.png',breach_plot)
+ggsave(filename='output/waitlist_plot.png',waitlist_plot)
 
 ## costs:
 
@@ -122,7 +125,7 @@ capacity_baseline <- CreateData(df_data = df_2,
 
 capacity_ideal <- CreateData(df_data = df_2,
                                 ref_growth = referral_growth,
-                                cap_growth = (1.03^(1/12)),
+                                cap_growth = (1.032^(1/12)),
                                 policy = 0.5,
                                 breach_limit = 4,
                                 jitter_factor = 0,
@@ -135,43 +138,14 @@ capacity_ideal <- CreateData(df_data = df_2,
   select(!cap) %>%
   mutate(date = max(df_1$date) + months(t))
 
-##
+capacity_plot_ideal <- ggplot() +
+  geom_col(data=capacity_ideal %>% pivot_longer(cols=!c(t,s,date),names_to='type',values_to='values'),
+           aes(x=t,y=values/1e6,fill=type))+
+  geom_vline(xintercept = 0,col='gray')+
+  theme_bw() +
+  THFstyle::scale_fill_THF()+
+  xlab('Months from present') +
+  ylab('Total activity needed to achieve 4m waitlist target (mn)')
 
-goals <- expand_grid(
-  'ref_growth' = c(-20:20/100),
-  'cap_growth' = c(-20:20/100)
-) %>%
-  dplyr::rowwise()%>%
-  mutate(
-    goal = CreateGoals(
-      df_data = df_2,
-      ref_growth = ref_growth,
-      cap_growth = cap_growth,
-      policy = 0.5,
-      breach_limit = 4,
-      jitter_factor = 0,
-      a_lim = 0.75
-    )
-  )
-
-goals_limit <- expand_grid(
-  'ref_growth' = (1+c(0,0.01,0.02,0.03,0.04,0.05))^(1/12),
-  'cap_growth' = (1+c(-100:100/1000))^(1/12)
-) %>%
-  dplyr::rowwise()%>%
-  mutate(
-    goal = CreateGoals(
-      df_data = df_2,
-      ref_growth = ref_growth,
-      cap_growth = cap_growth,
-      policy = 0.5,
-      breach_limit = 4,
-      jitter_factor = 0,
-      a_lim = 0.75
-    )
-  )
-  
-write.csv(goals,'output/goals.csv')
-
-ggplot()+
-  geom_function()
+ggsave(filename='output/capacity_plot.png',capacity_plot_ideal)
+write.csv(capacity_ideal,'output/capacity_ideal.csv')

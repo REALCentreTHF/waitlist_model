@@ -5,8 +5,7 @@
 CreateReferrals <- function(min_x,max_x,specialty,growth,starting_value,jitter_factor){
   expand_grid('t'=min_x:max_x,'s'=specialty) %>%
     dplyr::mutate(open = jitter(starting_value * ((growth))^t,factor=jitter_factor)) %>%
-    dplyr::mutate(i = -t)
-} %>%
+    dplyr::mutate(i = -t)} %>%
   as.data.frame()
 
 #Function to output waitlist shape over time (by buckets of months waiting)
@@ -175,19 +174,77 @@ WaitList <- function(x,capacity,result,df_a,df_c){
     
     #allocate result appropriately
     final_data[[j]] <- result[i>=0,]
-    
-    test <- (final_data %>%
-      dplyr::filter(t == sim_time) %>%
-      dplyr::mutate(
-        breach_flag = case_when(
-          i > 4 ~ 'breach',
-          TRUE ~ 'not_breach')) %>%
-      group_by(breach_flag) %>%
-      summarise(z = sum(z,na.rm=T)) %>%
-      pivot_wider(values_from=z,names_from=breach_flag) %>%
-      mutate(goal = (breach)/(not_breach+breach)))$goal
-    
+
   }
   #return func
   return(final_data)
+}
+
+
+CreateGoals <- function(df_data,ref_growth,cap_growth,policy,jitter_factor,breach_limit,a_lim){
+  
+  df_z_2 <- df_data %>%
+    dplyr::ungroup()%>%
+    #position as at latest
+    dplyr::filter(t == max(t)) %>%
+    dplyr::mutate(t=0) %>%
+    select(t,s,open,i) %>%
+    add_row(
+      CreateReferrals(1,sim_time,
+                      specialty=specs,
+                      growth=ref_growth,
+                      starting_value=starting_average,
+                      jitter_factor=jitter_factor)
+    ) %>%
+    rename(z='open')
+  
+  df_c <- df_data %>%
+    dplyr::mutate(c_a = completed/(open+completed))%>%
+    dplyr::group_by(i,s)
+  
+  # Fixed drop-off rates
+  df_a <- df_data %>%
+    dplyr::group_by(i,s) %>%
+    dplyr::summarise(a = quantile(a,a_lim,na.rm=T)) %>%
+    #this is the mother of all evil: 
+    #the drop-off is intensely consequential.
+    rbind(data.frame('i'=27,'a'=0.97,'s'=unique(df_2$s))) %>%
+    dplyr::mutate(a = case_when(is.nan(a)==TRUE ~ 0.5,
+                                T ~ a),
+                  i=i-1) %>%
+    dplyr::filter(i>=0)
+  
+  capacity <- CreateCapacity(x=sim_time,
+                             specialties=specs,
+                             growth=cap_growth,
+                             base_capacity=base_capacity)
+  
+  df_c <- df_c %>%
+    dplyr::summarise(
+      c = quantile(c_a,policy,na.rm=T),
+    )
+  
+  #Waitlist over time
+  data<- WaitList(x = sim_time,
+                  capacity=capacity,
+                  result=df_z_2,
+                  df_a=df_a,
+                  df_c=df_c) %>%
+    data.table::rbindlist()
+  
+  goal <- (data %>%
+    mutate(
+      breach_flag = case_when(
+        i > breach_limit ~ 'breach',
+        TRUE ~ 'not_breach')) %>%
+    ungroup()%>%
+    mutate(t == sim_time) %>%
+    group_by(breach_flag) %>%
+    summarise(z = sum(z)) %>%
+    pivot_wider(values_from=z,names_from=breach_flag) %>%
+    mutate(goal = breach/(breach+not_breach))%>%
+    ungroup())$goal
+  
+  return(goal)
+  
 }
