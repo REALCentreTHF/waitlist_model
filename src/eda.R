@@ -1,14 +1,38 @@
-# Synthetic growth rates -----------
+# dependancies -----------
 
 source('const/glob.R')
 source('src/functions.R')
 
-df_1 <- read.csv('output/df_1.csv')
-df_2 <- read.csv('output/df_2.csv')
+df_1 <- data.table::fread('output/df_1.csv')
+df_2 <- data.table::fread('output/df_2.csv')
 
-### EDA
+# inputs ----------------------------------------------------------
 
 sim_time <- 72+(5*12)
+
+# Fixed drop-off rates
+df_a <- df_2 %>%
+  dplyr::group_by(i,s) %>%
+  dplyr::summarise(a = quantile(a,0.5,na.rm=T)) %>%
+  #this is the mother of all evil: 
+  #the drop-off is intensely consequential.
+  rbind(data.frame('i'=27,'a'=0.97,'s'=unique(df_2$s))) %>%
+  dplyr::mutate(a = case_when(is.nan(a)==TRUE ~ 0.5,
+                              T ~ a),
+                i=i-1) %>%
+  dplyr::filter(i>=0)
+
+# Fixed capacity by year
+base_capacity <- df_1 %>%
+  dplyr::group_by(t,s) %>%
+  dplyr::summarise(capacity = sum(completed)) %>%
+  group_by(s)%>%
+  summarise(cap = quantile(capacity,0.75))
+
+# Fixed theta by year
+df_c <- df_2 %>%
+  dplyr::mutate(c_a = completed/(open+completed))%>%
+  dplyr::group_by(i,s)
 
 growth_stream <- df_1 %>%
   dplyr::filter(new != 0) %>%
@@ -18,8 +42,6 @@ growth_stream <- df_1 %>%
   drop_na()
 
 starting_average <- growth_stream$new %>% median
-
-# checks ----------------------------------------------------------
 
 old_data <- df_2 %>%
   dplyr::mutate(t=t-34,
@@ -34,8 +56,7 @@ old_data <- df_2 %>%
   dplyr::mutate(tot=breach+not_breach) %>%
   dplyr::ungroup()
 
-### calculations
-
+# calculations ----------------------------------------------------------
 
 baseline_jitter <- CreateData(df_data = df_2,
                               ref_growth = referral_growth,
@@ -106,7 +127,7 @@ breach_plot <- ggplot() +
 ggsave(filename='output/breach_plot.png',breach_plot)
 ggsave(filename='output/waitlist_plot.png',waitlist_plot)
 
-## costs:
+# costs -------
 
 capacity_baseline <- CreateData(df_data = df_2,
                        ref_growth = referral_growth,
@@ -121,7 +142,7 @@ capacity_baseline <- CreateData(df_data = df_2,
     dc = costs$admit_ratio * costs$daycase_ratio * cap,
     ord = costs$admit_ratio * costs$ordinary_ratio * cap) %>%
   select(!cap) %>%
-  mutate(date = max(df_1$date) + months(t))
+  mutate(date = max(lubridate::as_date(df_1$date)) + months(t))
 
 capacity_ideal <- CreateData(df_data = df_2,
                                 ref_growth = referral_growth,
@@ -136,7 +157,7 @@ capacity_ideal <- CreateData(df_data = df_2,
     dc = costs$admit_ratio * costs$daycase_ratio * cap,
     ord = costs$admit_ratio * costs$ordinary_ratio * cap) %>%
   select(!cap) %>%
-  mutate(date = max(df_1$date) + months(t))
+  mutate(date = max(lubridate::as_date(df_1$date)) + months(t))
 
 capacity_plot_ideal <- ggplot() +
   geom_col(data=capacity_ideal %>% pivot_longer(cols=!c(t,s,date),names_to='type',values_to='values'),
@@ -149,3 +170,7 @@ capacity_plot_ideal <- ggplot() +
 
 ggsave(filename='output/capacity_plot.png',capacity_plot_ideal)
 write.csv(capacity_ideal,'output/capacity_ideal.csv')
+
+# Predictions ------
+
+expand.grid('t'=1:10,'cap_growth'=1,'ref_growth' = c(1,2,3)/100)
