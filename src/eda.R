@@ -139,6 +139,10 @@ capacity_baseline <- CreateData(df_data = df_2,
   mutate(
     first = cap,
     fups = costs$fup_ratio * cap,
+    ncl = (ncl_ratio) * (costs$fup_ratio + 1) * cap,
+    cl = (1-ncl_ratio) * (costs$fup_ratio + 1)* cap,
+    proc = (proc_ratio) * (costs$fup_ratio + 1)* cap,
+    non_proc = (1-proc_ratio) * (costs$fup_ratio + 1)* cap,
     dc = costs$admit_ratio * costs$daycase_ratio * cap,
     ord = costs$admit_ratio * costs$ordinary_ratio * cap) %>%
   select(!cap) %>%
@@ -154,10 +158,26 @@ capacity_ideal <- CreateData(df_data = df_2,
   mutate(
     first = cap,
     fups = costs$fup_ratio * cap,
+    ncl = (ncl_ratio) * (costs$fup_ratio + 1) * cap,
+    cl = (1-ncl_ratio) * (costs$fup_ratio + 1)* cap,
+    proc = (proc_ratio) * (costs$fup_ratio + 1)* cap,
+    non_proc = (1-proc_ratio) * (costs$fup_ratio + 1)* cap,
     dc = costs$admit_ratio * costs$daycase_ratio * cap,
     ord = costs$admit_ratio * costs$ordinary_ratio * cap) %>%
   select(!cap) %>%
   mutate(date = max(lubridate::as_date(df_1$date)) + months(t))
+
+capacity_cost_ideal <- capacity_ideal %>%
+  mutate(ncl_costing = ncl * ncl_cost,
+         cl_costing = cl * cl_cost,
+         in_cost = ord * in_cost,
+         dc_cost = dc * dc_cost,
+         proc_cost = proc * proc_cost) %>%
+  select(t,ncl_costing,cl_costing,in_cost,dc_cost,proc_cost) %>%
+  pivot_longer(cols=!t,names_to='type',values_to='cost') %>%
+  group_by(t)%>%
+  summarise(cost=sum(cost,na.rm=T))
+  
 
 capacity_plot_ideal <- ggplot() +
   geom_col(data=capacity_ideal %>% pivot_longer(cols=!c(t,s,date),names_to='type',values_to='values'),
@@ -170,6 +190,7 @@ capacity_plot_ideal <- ggplot() +
 
 ggsave(filename='output/capacity_plot.png',capacity_plot_ideal)
 write.csv(capacity_ideal,'output/capacity_ideal.csv')
+write.csv(capacity_cost_ideal,'output/capacity_cost_ideal.csv')
 
 # Predictions ------
 
