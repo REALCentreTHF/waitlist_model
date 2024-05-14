@@ -34,3 +34,12 @@ costs <- data.frame(
   'uq' = c(0.4358294,0.3590254,2.2686739,0.0794380)) %>% 
   select(metric,median) %>% 
   pivot_wider(names_from='metric',values_from='median')
+
+proc_ratio <- 0.19145
+ncl_ratio <- 0.153814
+
+in_cost <- 5845
+dc_cost <- 1038
+cl_cost <- 184
+ncl_cost <- 119
+proc_cost <- 203
