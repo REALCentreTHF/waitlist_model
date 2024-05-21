@@ -8,7 +8,7 @@ df_2 <- data.table::fread('output/df_2.csv')
 
 # inputs ----------------------------------------------------------
 
-sim_time <- 72+(5*12)
+sim_time <- (12*12)
 
 # Fixed drop-off rates
 df_a <- df_2 %>%
@@ -39,7 +39,7 @@ growth_stream <- df_1 %>%
   dplyr::ungroup()%>%
   dplyr::select(t,new,s) %>%
   dplyr::arrange(t) %>%
-  drop_na()
+  tidyr::drop_na()
 
 starting_average <- growth_stream$new %>% median
 
@@ -139,8 +139,8 @@ capacity_baseline <- CreateData(df_data = df_2,
   mutate(
     first = cap,
     fups = costs$fup_ratio * cap,
-    ncl = (ncl_ratio) * (costs$fup_ratio + 1) * cap,
-    cl = (1-ncl_ratio) * (costs$fup_ratio + 1)* cap,
+    ncl = (ncl_ratio) * (costs$fup_ratio + 1) * (1-proc_ratio)* cap,
+    cl = (1-ncl_ratio) * (costs$fup_ratio + 1)* (1-proc_ratio)*cap,
     proc = (proc_ratio) * (costs$fup_ratio + 1)* cap,
     non_proc = (1-proc_ratio) * (costs$fup_ratio + 1)* cap,
     dc = costs$admit_ratio * costs$daycase_ratio * cap,
@@ -158,8 +158,8 @@ capacity_ideal <- CreateData(df_data = df_2,
   mutate(
     first = cap,
     fups = costs$fup_ratio * cap,
-    ncl = (ncl_ratio) * (costs$fup_ratio + 1) * cap,
-    cl = (1-ncl_ratio) * (costs$fup_ratio + 1)* cap,
+    ncl = (ncl_ratio) * (costs$fup_ratio + 1) * (1-proc_ratio)* cap,
+    cl = (1-ncl_ratio) * (costs$fup_ratio + 1)* (1-proc_ratio)*cap,
     proc = (proc_ratio) * (costs$fup_ratio + 1)* cap,
     non_proc = (1-proc_ratio) * (costs$fup_ratio + 1)* cap,
     dc = costs$admit_ratio * costs$daycase_ratio * cap,
@@ -173,25 +173,47 @@ capacity_cost_ideal <- capacity_ideal %>%
          in_cost = ord * in_cost,
          dc_cost = dc * dc_cost,
          proc_cost = proc * proc_cost) %>%
-  select(t,ncl_costing,cl_costing,in_cost,dc_cost,proc_cost) %>%
-  pivot_longer(cols=!t,names_to='type',values_to='cost') %>%
-  group_by(t)%>%
-  summarise(cost=sum(cost,na.rm=T))
-  
+  select(date,ncl_costing,cl_costing,in_cost,dc_cost,proc_cost) %>%
+  pivot_longer(cols=!date,names_to='type',values_to='cost') %>%
+  group_by(year(date),type)%>%
+  summarise(cost=sum(cost,na.rm=T)/1e9)
 
-capacity_plot_ideal <- ggplot() +
-  geom_col(data=capacity_ideal %>% pivot_longer(cols=!c(t,s,date),names_to='type',values_to='values'),
-           aes(x=t,y=values/1e6,fill=type))+
-  geom_vline(xintercept = 0,col='gray')+
-  theme_bw() +
+capacity_cost_baseline <- capacity_baseline %>%
+  mutate(ncl_costing = ncl * ncl_cost,
+         cl_costing = cl * cl_cost,
+         in_cost = ord * in_cost,
+         dc_cost = dc * dc_cost,
+         proc_cost = proc * proc_cost) %>%
+  select(date,ncl_costing,cl_costing,in_cost,dc_cost,proc_cost) %>%
+  pivot_longer(cols=!date,names_to='type',values_to='cost') %>%
+  group_by(year(date),type)%>%
+  summarise(cost=sum(cost,na.rm=T)/1e9)
+
+final_cost_data <- capacity_cost_baseline %>%
+  rename(year='year(date)',
+         base_cost = 'cost') %>%
+  left_join(.,capacity_cost_ideal %>%
+              rename(year='year(date)',
+                     ideal_cost = 'cost'),
+            by=c('year','type')) %>%
+  filter(year != 2036) %>%
+  mutate(diff = (ideal_cost - base_cost) * 1.023^(year-2023))
+
+final_cost_data_total <- final_cost_data %>%
+  group_by(year) %>%
+  summarise(diff = sum(diff))
+
+cost_plot <- ggplot() +
+  geom_col(data= final_cost_data,aes(x=year,y=diff,fill=type)) +
+  geom_text(data=final_cost_data_total,aes(x=year,y=diff,label=paste0('£',round(diff,1),'b'),vjust=-0.5)) +
+  theme_bw(base_size =12) +
   THFstyle::scale_fill_THF()+
   xlab('Months from present') +
-  ylab('Total activity needed to achieve 4m waitlist target (mn)')
+  ylab('Additional real annual cost (£bn) to clearing the backlog')
 
-ggsave(filename='output/capacity_plot.png',capacity_plot_ideal)
+ggsave(filename='output/cost_plot.png',cost_plot)
+
 write.csv(capacity_ideal,'output/capacity_ideal.csv')
+write.csv(capacity_baseline,'output/capacity_ideal.csv')
 write.csv(capacity_cost_ideal,'output/capacity_cost_ideal.csv')
-
-# Predictions ------
-
-expand.grid('t'=1:10,'cap_growth'=1,'ref_growth' = c(1,2,3)/100)
+write.csv(capacity_cost_baseline,'output/capacity_cost_baseline.csv')
