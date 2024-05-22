@@ -6,6 +6,15 @@ source('src/functions.R')
 df_1 <- data.table::fread('output/df_1.csv')
 df_2 <- data.table::fread('output/df_2.csv')
 
+w <- 0.632
+d <- 0.292
+r <- 1 - w - d
+
+#Function to generate productivity changes across time
+CreateIndex <- function(w,d,r,prod,pay,drug,deflator){
+  1 + (( (w*(pay-prod)) + (r*(drug-prod)) + (d*(1-prod) )))
+}
+
 # inputs ----------------------------------------------------------
 
 sim_time <- (12*12)
@@ -197,7 +206,25 @@ final_cost_data <- capacity_cost_baseline %>%
                      ideal_cost = 'cost'),
             by=c('year','type')) %>%
   filter(year != 2036) %>%
-  mutate(diff = (ideal_cost - base_cost) * 1.023^(year-2023))
+  group_by(type) %>%
+  mutate(diff = (ideal_cost - base_cost),
+         prod = 1.0058,
+         pay = 1.008,
+         drug = 1.025,
+         val_prod = cumprod(prod),
+         val_pay = cumprod(pay),
+         val_drug = cumprod(drug)) %>%
+  ungroup()%>%
+  rowwise() %>%
+  mutate(index = CreateIndex(w=w,
+                               d = d,
+                               r = r,
+                               prod = val_prod,
+                               drug = val_drug,
+                               pay = val_pay,
+                               deflator = 1
+                               ),
+         diff_fin = diff * index)
 
 final_cost_data_total <- final_cost_data %>%
   group_by(year) %>%
