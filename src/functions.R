@@ -9,11 +9,11 @@ CreateReferrals <- function(min_x,max_x,specialty,growth,starting_value,jitter_f
   as.data.frame()
 
 #Function to output waitlist shape over time (by buckets of months waiting)
-WaitList <- function(x,capacity,result,df_a,df_c){
+WaitList <- function(x,result,df_cap,df_a,df_c){
   
   #Set as DT
   data.table::setDT(result)
-  data.table::setDT(capacity)
+  data.table::setDT(df_cap)
   
   #pre-allocate empty list of length x
   final_data <- vector('list',x)
@@ -31,7 +31,7 @@ WaitList <- function(x,capacity,result,df_a,df_c){
     #join on c
     result[as.data.frame(df_c),on=c('i','s'), c:=c]
     #join on c
-    result[capacity[t==j,],on=c('s'),cap:=cap]
+    result[df_cap[t==j,],on=c('s'),cap:=cap]
     
     #Calc sum by group t, s
     result[i>=0, z_c := (z*c)]
@@ -63,7 +63,7 @@ CreateCapacity <- function(x,specialties,growth,base_capacity){
     mutate(cap = cap*(growth)^t)
 }
 
-CreateData <- function(df_data,ref_growth,cap_growth,policy,jitter_factor,breach_limit,a_lim){
+CreateData <- function(df_data,ref_growth,capacity,policy,jitter_factor,breach_limit,a_lim){
   
   df_z_2 <- df_data %>%
     dplyr::ungroup()%>%
@@ -96,11 +96,6 @@ CreateData <- function(df_data,ref_growth,cap_growth,policy,jitter_factor,breach
                   i=i-1) %>%
     dplyr::filter(i>=0)
   
-  capacity <- CreateCapacity(x=sim_time,
-                             specialties=specs,
-                             growth=cap_growth,
-                             base_capacity=base_capacity)
-  
   df_c <- df_c %>%
     dplyr::summarise(
       c = quantile(c_a,policy,na.rm=T),
@@ -108,7 +103,7 @@ CreateData <- function(df_data,ref_growth,cap_growth,policy,jitter_factor,breach
   
   #Waitlist over time
   data<- WaitList(x = sim_time,
-                  capacity=capacity,
+                  df_cap=capacity,
                   result=df_z_2,
                   df_a=df_a,
                   df_c=df_c) %>%
@@ -128,4 +123,9 @@ CreateData <- function(df_data,ref_growth,cap_growth,policy,jitter_factor,breach
     
   return(list('breaches'=breaches,'capacity'=capacity))
   
+}
+
+#Function to generate productivity changes across time
+CreateIndex <- function(w,d,r,prod,pay,drug,deflator){
+  1 + (( (w*(pay-prod)) + (r*(drug-prod)) + (d*(1-prod) )))
 }

@@ -1,4 +1,3 @@
-
 glob_specs <- c('C_999',
                 'C_110',
                 'C_130',
@@ -26,6 +25,11 @@ thf2 <- '#2a7979'
 
 capacity_growth <- (1.025)^(1/12)
 referral_growth <- (1.02)^(1/12)
+
+w <- 0.632
+d <- 0.292
+r <- 1 - w - d
+ideal_growth <- 1.052
 
 costs <- data.frame(
   'metric' = c('admit_ratio','daycase_ratio','fup_ratio','ordinary_ratio'),
