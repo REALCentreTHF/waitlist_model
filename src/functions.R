@@ -1,3 +1,4 @@
+library(docstring)
 
 # Functions -------
 
@@ -11,7 +12,15 @@ CreateReferrals <- function(min_x,max_x,specialty,growth,starting_value,jitter_f
 #Function to output waitlist shape over time (by buckets of months waiting)
 WaitList <- function(x,result,df_cap,df_a,df_c){
   
-  #Set as DT
+  #' This function simulates the amount of patients on the
+  #' Elective Waitlist by waiting bucket over time based on 
+  #' treatment prioritisation weights and drop-off assumptions.
+  #' @param x integer Length of simulation in months
+  #' @param result dataframe Dataframe of wait times by bucket
+  #' @param df_cap dataframe Dataframe of capacity growth over time
+  #' @param df_a dataframe Dataframe of drop-off by buckets
+  #' @param df_c dataframe Dataframe of treatment assumptions
+  
   data.table::setDT(result)
   data.table::setDT(df_cap)
   
@@ -128,4 +137,47 @@ CreateData <- function(df_data,ref_growth,capacity,policy,jitter_factor,breach_l
 #Function to generate productivity changes across time
 CreateIndex <- function(w,d,r,prod,pay,drug,deflator){
   1 + (( (w*(pay-prod)) + (r*(drug-prod)) + (d*(1-prod) )))
+}
+
+
+GetBreachRatio <- function(c_growth, breach_limit){
+  
+  capacity <- CreateCapacity(x=sim_time,
+                             specialties=specs,
+                             growth=c_growth, #this is what needs to be fixed.
+                             base_capacity=base_capacity)
+  
+  #Waitlist over time
+  data <-  WaitList(x = sim_time,
+                    df_cap=capacity,
+                    result=df_z,
+                    df_a=df_a,
+                    df_c=df_c) %>%
+    data.table::rbindlist()
+  
+  ratio <- sum(data[i >= breach_limit & t == max(t)]$z)/sum(data[i>=0 & t == max(t)]$z)
+  return(ratio)
+}
+
+GetTotalWaitlist <- function(c_growth){
+  
+  capacity <- CreateCapacity(x=sim_time,
+                             specialties=specs,
+                             growth=c_growth, #this is what needs to be fixed.
+                             base_capacity=base_capacity)
+  
+  #Waitlist over time
+  data<- WaitList(x = sim_time,
+                  df_cap=capacity,
+                  result=df_z_2,
+                  df_a=df_a,
+                  df_c=df_c) %>%
+    data.table::rbindlist()
+  
+  breaches <- data %>%
+    group_by(t) %>%
+    summarise(z = sum(z)) %>%
+    filter(t == max(t))
+  
+  return(breaches$z)
 }

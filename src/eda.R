@@ -1,38 +1,24 @@
-# dependancies -----------
+# Dependancies -----------
 
 source('const/glob.R')
 source('src/functions.R')
 
 df_1 <- data.table::fread('output/df_1.csv')
 df_2 <- data.table::fread('output/df_2.csv')
+df_a <- data.table::fread('output/df_a.csv')
+df_c <- data.table::fread('output/df_c.csv')
 
-# inputs ----------------------------------------------------------
+# Raw inputs ----------------------------------------------------------
 
 sim_time <- (10*12)
-
-# Fixed drop-off rates
-df_a <- df_2 %>%
-  dplyr::group_by(i,s) %>%
-  dplyr::summarise(a = quantile(a,0.5,na.rm=T)) %>%
-  #this is the mother of all evil: 
-  #the drop-off is intensely consequential.
-  rbind(data.frame('i'=27,'a'=0.97,'s'=unique(df_2$s))) %>%
-  dplyr::mutate(a = case_when(is.nan(a)==TRUE ~ 0.5,
-                              T ~ a),
-                i=i-1) %>%
-  dplyr::filter(i>=0)
 
 # Fixed capacity by year
 base_capacity <- df_1 %>%
   dplyr::group_by(t,s) %>%
   dplyr::summarise(capacity = sum(completed)) %>%
   group_by(s)%>%
-  summarise(cap = quantile(capacity,0.75))
-
-# Fixed theta by year
-df_c <- df_2 %>%
-  dplyr::mutate(c_a = completed/(open+completed))%>%
-  dplyr::group_by(i,s)
+  filter(t >= max(t)-12) %>%
+  summarise(cap = quantile(capacity,0.5))
 
 growth_stream <- df_1 %>%
   dplyr::filter(new != 0) %>%
@@ -41,10 +27,13 @@ growth_stream <- df_1 %>%
   dplyr::arrange(t) %>%
   tidyr::drop_na()
 
-starting_average <- growth_stream$new %>% median
+#mean of the past 12 months
+starting_average <- (growth_stream %>% 
+                       filter(t <= max(t)-12))$new %>% 
+  mean
 
 old_data <- df_2 %>%
-  dplyr::mutate(t=t-34,
+  dplyr::mutate(t=t-max(t),
                 z =  open)%>%
   dplyr::mutate(
       breach_flag = dplyr::case_when(
@@ -58,7 +47,7 @@ old_data <- df_2 %>%
 
 capacity_0_5 <- CreateCapacity(x=60,
                            specialties=specs,
-                           growth=1.052^(1/12),
+                           growth=1.049^(1/12),
                            base_capacity=base_capacity)
 
 midterm_capacity <- capacity_0_5%>%filter(t==max(t)) %>% select(!t)
@@ -72,7 +61,7 @@ capacity_5_10 <- CreateReferrals(min_x=1,
   filter(i <= -60) %>%
   select(!i) %>%
   rename('cap'=open) %>%
-  mutate(cap = cap*0.975)
+  mutate(cap = cap*0.974)
                                
 capacity_ideal <- rbind(capacity_0_5,
                   capacity_5_10)
@@ -82,7 +71,7 @@ capacity_baseline <- CreateCapacity(x=sim_time,
                                     growth=capacity_growth,
                                     base_capacity=base_capacity)
 
-# calculations ----------------------------------------------------------
+# Waitlist Size ----------------------------------------------------------
 
 baseline <- CreateData(df_data = df_2,
                        ref_growth = referral_growth,
@@ -91,8 +80,8 @@ baseline <- CreateData(df_data = df_2,
                        breach_limit = 4,
                        jitter_factor = 0,
                        a_lim = 0.75)$breaches %>%
-  add_row(
-    old_data %>% filter(t == 0))
+  mutate(ratio = breach/tot) %>%
+  add_row(old_data %>% filter(t == 0))
 
 ideal <- CreateData(df_data = df_2,
                        ref_growth = referral_growth,
@@ -100,9 +89,9 @@ ideal <- CreateData(df_data = df_2,
                        policy = 0.5,
                        breach_limit = 4,
                        jitter_factor = 0,
-                       a_lim = 0.75)$breaches %>%
-  add_row(
-    old_data %>% filter(t == 0))
+                       a_lim = 0.75)$breaches%>%
+  mutate(ratio = breach/tot) %>%
+  add_row(old_data %>% filter(t == 0))
 
 waitlist_plot <- ggplot() +
   geom_line(data=old_data,aes(x=t,y=tot/1e6),linetype=1,linewidth=1)+
@@ -113,22 +102,11 @@ waitlist_plot <- ggplot() +
   theme_bw(base_size=16) +
   xlab('Months from present') +
   ylab('Number of open RTT pathways (mn)') +
-  ylim(0,8)
+  ylim(0,11)
 
-breach_plot <- ggplot() +
-  geom_line(data=old_data,aes(x=t,y=(breach/(tot))),linetype=1)+
-  geom_line(data=baseline,aes(x=t,y=(breach/(tot))),linetype=1,col=thf)+
-  geom_line(data=ideal,aes(x=t,y=(breach/(tot))),linetype=1,col=thf2)+
-  geom_vline(xintercept = 0,col='gray')+
-  theme_bw(base_size=16) +
-  xlab('Months from present') +
-  ylab('Proportion of 18w breaches') +
-  scale_y_continuous(labels = scales::percent)
-  
-ggsave(filename='output/breach_plot.png',breach_plot)
 ggsave(filename='output/waitlist_plot.png',waitlist_plot)
 
-# costs -------
+# Waitlist Activity & Costs -------
 
 capacity_baseline <- CreateData(df_data = df_2,
                        ref_growth = referral_growth,
@@ -233,15 +211,15 @@ final_cost_data_total <- final_cost_data %>%
   summarise(diff = sum(diff))
 
 cost_plot <- ggplot() +
-  geom_col(data= final_cost_data,aes(x=year,y=diff,fill=type)) +
-  geom_text(data=final_cost_data_total,aes(x=year,y=diff,label=paste0('£',round(diff,1),'b'),vjust=-0.5)) +
+  geom_col(data= final_cost_data,aes(x=year-2024,y=diff,fill=type)) +
+  geom_text(data=final_cost_data_total,aes(x=year-2024,y=diff,label=paste0('£',round(diff,1),'b'),vjust=-0.5)) +
   theme_bw(base_size =12) +
   THFstyle::scale_fill_THF()+
-  xlab('Years from present') +
+  labs(fill='Care activity')+
+  xlab('Years from present')+
   ylab('Additional real annual cost (£bn) to clearing the backlog')
 
 ggsave(filename='output/cost_plot.png',cost_plot)
-
 write.csv(capacity_total,'output/capacity_total.csv')
 write.csv(final_cost_data,'output/final_cost_data.csv')
 write.csv(capacity_cost_ideal,'output/capacity_cost_ideal.csv')

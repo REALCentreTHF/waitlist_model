@@ -102,3 +102,20 @@ df_2 <- df_1 %>%
                   open/carried < 0 ~ 1,
                   TRUE ~ open/carried)) %>%
   dplyr::select(t,i,a,s,open,completed,carried)
+
+# Fixed drop-off rates
+df_a <- df_2 %>%
+  dplyr::group_by(i,s) %>%
+  dplyr::summarise(a = quantile(a,0.5,na.rm=T)) %>%
+  #this is the mother of all evil: 
+  #the drop-off is intensely consequential.
+  rbind(data.frame('i'=27,'a'=0.97,'s'=unique(df_2$s))) %>%
+  dplyr::mutate(a = case_when(is.nan(a)==TRUE ~ 0.5,
+                              T ~ a),
+                i=i-1) %>%
+  dplyr::filter(i>=0)
+
+# Fixed theta by year
+df_c <- df_2 %>%
+  dplyr::mutate(c_a = completed/(open+completed))%>%
+  dplyr::group_by(i,s)
