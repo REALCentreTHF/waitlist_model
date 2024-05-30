@@ -89,7 +89,7 @@ ideal <- CreateData(df_data = df_2,
                        policy = 0.5,
                        breach_limit = 4,
                        jitter_factor = 0,
-                       a_lim = 0.75)$breaches%>%
+                       a_lim = 0.75)$breaches %>%
   mutate(ratio = breach/tot) %>%
   add_row(old_data %>% filter(t == 0))
 
@@ -102,13 +102,13 @@ waitlist_plot <- ggplot() +
   theme_bw(base_size=16) +
   xlab('Months from present') +
   ylab('Number of open RTT pathways (mn)') +
-  ylim(0,11)
+  ylim(0,8)
 
 ggsave(filename='output/waitlist_plot.png',waitlist_plot)
 
 # Waitlist Activity & Costs -------
 
-capacity_baseline <- CreateData(df_data = df_2,
+activity_baseline <- CreateData(df_data = df_2,
                        ref_growth = referral_growth,
                        capacity = capacity_baseline,
                        policy = 0.5,
@@ -127,7 +127,7 @@ capacity_baseline <- CreateData(df_data = df_2,
   select(!cap) %>%
   mutate(date = max(lubridate::as_date(df_1$date)) + months(t)) 
 
-capacity_ideal <- CreateData(df_data = df_2,
+activity_ideal <- CreateData(df_data = df_2,
                                 ref_growth = referral_growth,
                              capacity = capacity_ideal,
                              policy = 0.5,
@@ -146,17 +146,17 @@ capacity_ideal <- CreateData(df_data = df_2,
   select(!cap) %>%
   mutate(date = max(lubridate::as_date(df_1$date)) + months(t))
 
-capacity_ideal1 <- capacity_ideal %>%
+activity_ideal1 <- activity_ideal %>%
   pivot_longer(cols=!c('t','s','date'),names_to='activity_type',values_to='ideal_value') %>%
   mutate(measure_type = 'activity')
 
-capacity_baseline1 <- capacity_baseline %>%
+activity_baseline1 <- activity_baseline %>%
   pivot_longer(cols=!c('t','s','date'),names_to='activity_type',values_to='baseline_value') %>%
   mutate(measure_type = 'activity')
 
-capacity_total <- left_join(capacity_ideal1,capacity_baseline1,by=c('s','t','date','measure_type','activity_type'))
+activity_total <- left_join(activity_ideal1,activity_baseline1,by=c('s','t','date','measure_type','activity_type'))
 
-capacity_cost_ideal <- capacity_ideal %>%
+cost_ideal <- activity_ideal %>%
   mutate(ncl_costing = ncl * ncl_cost,
          cl_costing = cl * cl_cost,
          in_cost = ord * in_cost,
@@ -167,7 +167,7 @@ capacity_cost_ideal <- capacity_ideal %>%
   group_by(year(date),type)%>%
   summarise(cost=sum(cost,na.rm=T)/1e9)
 
-capacity_cost_baseline <- capacity_baseline %>%
+cost_baseline <- activity_baseline %>%
   mutate(ncl_costing = ncl * ncl_cost,
          cl_costing = cl * cl_cost,
          in_cost = ord * in_cost,
@@ -178,10 +178,10 @@ capacity_cost_baseline <- capacity_baseline %>%
   group_by(year(date),type)%>%
   summarise(cost=sum(cost,na.rm=T)/1e9)
 
-final_cost_data <- capacity_cost_baseline %>%
+final_cost_data <- cost_baseline %>%
   rename(year='year(date)',
          base_cost = 'cost') %>%
-  left_join(.,capacity_cost_ideal %>%
+  left_join(.,cost_ideal %>%
               rename(year='year(date)',
                      ideal_cost = 'cost'),
             by=c('year','type')) %>%
