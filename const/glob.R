@@ -42,8 +42,25 @@ costs <- data.frame(
 proc_ratio <- 0.19145
 ncl_ratio <- 0.153814
 
-in_cost <- 5845
-dc_cost <- 1038
-cl_cost <- 184
-ncl_cost <- 119
-proc_cost <- 203
+#2021 costs
+#in_cost <- 5845
+#dc_cost <- 1038
+#cl_cost <- 184
+#ncl_cost <- 119
+#proc_cost <- 203
+
+#2018 costs
+in_cost <- 4078
+dc_cost <- 752
+cl_cost <- 144
+ncl_cost <- 84
+proc_cost <- 148
+
+data_2018 <- data.table::fread('const/rtt_data.csv') %>%
+  filter(treatment_function_code == 'C_999') %>%
+  janitor::clean_names() %>%
+  filter(my(date) >= my('03/2018') & my(date) < my('03/2019')) %>%
+  mutate(completed = completed_pathways_for_admitted_patients + completed_pathways_for_non_admitted_patients) %>%
+  group_by(date) %>%
+  summarise(completed = sum(completed,na.rm=T),
+            new_rtt = sum(new_rtt_periods_all_patients,na.rm=T))
