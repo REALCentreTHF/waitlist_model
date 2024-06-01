@@ -146,13 +146,6 @@ activity_ideal <- CreateData(df_data = df_2,
   select(!cap) %>%
   mutate(date = max(lubridate::as_date(df_1$date)) + months(t))
 
-ratio_2018 <- activity_ideal %>%
-  select(date,first) %>%
-  mutate(baseline_2018 = mean(data_2018$completed),
-         ratio = (first/baseline_2018)-1) %>%
-  select(date,ratio) %>%
-  mutate(date = (zoo::as.yearmon(date)))
-  
 activity_ideal1 <- activity_ideal %>%
   pivot_longer(cols=!c('t','s','date'),names_to='activity_type',values_to='ideal_value') %>%
   mutate(measure_type = 'activity')
@@ -172,11 +165,8 @@ cost_ideal <- activity_ideal %>%
   select(date,ncl_costing,cl_costing,in_cost,dc_cost,proc_cost) %>%
   pivot_longer(cols=!date,names_to='type',values_to='cost') %>%
   mutate(date = zoo::as.yearmon(date)) %>%
-  left_join(.,ratio_2018,by='date') %>%
-  mutate(cost_above_2018 = cost * ratio) %>%
   group_by(year(date),type)%>%
-  summarise(cost=sum(cost,na.rm=T)/1e9,
-            cost_above_2018 = sum(cost_above_2018,na.rm=T)/1e9)
+  summarise(cost=sum(cost,na.rm=T)/1e9,)
 
 cost_baseline <- activity_baseline %>%
   mutate(ncl_costing = ncl * ncl_cost,
@@ -231,7 +221,6 @@ cost_plot <- ggplot() +
   ylab('Additional real annual cost (£bn) to clearing the backlog')
 
 ggsave(filename='output/cost_plot.png',cost_plot)
-write.csv(capacity_total,'output/capacity_total.csv')
 write.csv(final_cost_data,'output/final_cost_data.csv')
-write.csv(capacity_cost_ideal,'output/capacity_cost_ideal.csv')
-write.csv(capacity_cost_baseline,'output/capacity_cost_baseline.csv')
+write.csv(activity_total,'output/activity_total.csv')
+

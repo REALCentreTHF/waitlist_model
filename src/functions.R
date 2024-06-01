@@ -76,8 +76,8 @@ CreateData <- function(df_data,ref_growth,capacity,policy,jitter_factor,breach_l
   
   df_z_2 <- df_data %>%
     dplyr::ungroup()%>%
-    #position as at latest
-    dplyr::filter(t == max(t)) %>%
+    #position as at latest (2024/03)
+    dplyr::filter(t == 35) %>%
     dplyr::mutate(t=0) %>%
     select(t,s,open,i) %>%
     add_row(
@@ -156,7 +156,9 @@ GetBreachRatio <- function(c_growth, breach_limit){
     data.table::rbindlist()
   
   ratio <- sum(data[i >= breach_limit & t == max(t)]$z)/sum(data[i>=0 & t == max(t)]$z)
+  
   return(ratio)
+  
 }
 
 GetTotalWaitlist <- function(c_growth){
