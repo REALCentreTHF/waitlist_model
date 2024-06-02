@@ -10,7 +10,7 @@ df_c <- data.table::fread('output/df_c.csv')
 
 # Raw inputs ----------------------------------------------------------
 
-sim_time <- (10*12)
+sim_time <- (11*12)
 
 # Fixed capacity by year
 base_capacity <- df_1 %>%
