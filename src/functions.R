@@ -183,3 +183,36 @@ GetTotalWaitlist <- function(c_growth){
   
   return(breaches$z)
 }
+
+SimulatePatients <- function(sim_n,risk_lambda,sigma_matrix,means){
+  
+  if(missing(risk_lambda)){
+    risk_lambda <- 4
+  } else {
+    risk_lambda
+  }
+  
+  #Sex is assumed independent for now, 50-50 chance
+  sex <- sample(x=c('M','F'),size=sim_n,replace=T)
+  #Risk appetite can either be assumed related to deprivation, sev? here rand
+  risk_appetite <- rpois(n = sim_n,lambda = risk_lambda)
+  
+  #correlations
+  sim_data_1  <- MASS::mvrnorm(n = sim_n, 
+                               mu = means, 
+                               Sigma = sigma_matrix)
+  
+  #chosen columns
+  colnames(sim_data_1) <- c("deprivation", "age", "severity");
+  #create pat id col
+  sp <- data.table::data.table(
+    risk_appetite,
+    sex,
+    sim_data_1
+  )
+
+  #generate id
+  sp[,patient_id := ids::random_id(sim_n,4)]
+
+  return(sp)
+}
