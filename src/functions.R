@@ -1,96 +1,218 @@
+library(docstring)
+
 # Functions -------
 
-#Gets links from any single url; string matches
-GetLinks <- function(url_name,string){
-  files <- c()
-  #this is inefficient and bad practice but it's a small vector.
-  for(i in seq_along(url_name)){
-    pg <- rvest::read_html(url_name[i])
-    pg<-(rvest::html_attr(rvest::html_nodes(pg, "a"), "href"))
-    files <- c(files,pg[grepl(string,pg)])
-    files <- files %>% unique()
-  }
-  return(files)
-}
-
-#Read all csvs from urls; unz for zips
-UnzipCSV <- function(files){
-  #creates temp file to read in the data
-  temp <- tempfile()
-  download.file(files,temp)
-  #This is needed because a zip file may have multiple files
-  file_names <- unzip(temp,list=T)$Name
-  data<- lapply(file_names,
-                function(x){
-                  da <- data.table::fread(unzip(temp,x))
-                  #janitor to clean unruly names
-                  names(da) <- names(da) %>% janitor::make_clean_names()  
-                  return(da)
-                })
-  #unlink the temp file, important to do
-  unlink(temp)
-  data}
+#create grid
+CreateReferrals <- function(min_x,max_x,specialty,growth,starting_value,jitter_factor){
+  expand_grid('t'=min_x:max_x,'s'=specialty) %>%
+    dplyr::mutate(open = jitter(starting_value * ((growth))^t,factor=jitter_factor)) %>%
+    dplyr::mutate(i = -t)} %>%
+  as.data.frame()
 
 #Function to output waitlist shape over time (by buckets of months waiting)
-WaitList <- function(x,cap_el,result,df_a,df_c){
+WaitList <- function(x,result,df_cap,df_a,df_c){
+  
+  #' This function simulates the amount of patients on the
+  #' Elective Waitlist by waiting bucket over time based on 
+  #' treatment prioritisation weights and drop-off assumptions.
+  #' @param x integer Length of simulation in months
+  #' @param result dataframe Dataframe of wait times by bucket
+  #' @param df_cap dataframe Dataframe of capacity growth over time
+  #' @param df_a dataframe Dataframe of drop-off by buckets
+  #' @param df_c dataframe Dataframe of treatment assumptions
+  
+  data.table::setDT(result)
+  data.table::setDT(df_cap)
+  
+  #pre-allocate empty list of length x
+  final_data <- vector('list',x)
+  
   #Where j
   for(j in 1:x){
     
-    #cap i at 26
-    result <- result %>%
-      dplyr::mutate(i = case_when(i > 26 ~ 26,
-                                  TRUE ~ i)) %>%
-      dplyr::group_by(i) %>%
-      dplyr::summarise(z = sum(z,na.rm=T))
-    
-    #apply formula
-    result['z'][result$i>=0,] <-
-      #first multiple everything by ta
-      (df_a['a']*
-      #First term: z(i) * a(i)
-      ((result['z'][result$i>=0,]) - 
-      #second term: theta(i)*c
-      (result['z'][result$i>=0,]*df_c['c']*cap_el)/(sum(result['z'][result$i>=0,]*df_c['c']))))
-    if(j == x){result$i <- result$i}else{result$i <- result$i + 1}
-  }
-  return(
-    list(
-      #return list of elements
-      l = data.frame('i'=0:26,'z'=result['z'][result$i>=0,],t=x)
-      
-    ))
-}
+    #cap i at 24
 
-#Returns wait times, wait list size, and percent breaches
-WaitTimes <- function(x,cap_el,result,breach,df_a,df_c){
+    result[i >= 24, i := 24]
+    result <- result[,.(z=sum(z)),by=c('i','s')]
+    
+    #join on a
+    result[as.data.frame(df_a),on=c('i','s'), a:=a]
+    #join on c
+    result[as.data.frame(df_c),on=c('i','s'), c:=c]
+    #join on c
+    result[df_cap[t==j,],on=c('s'),cap:=cap]
+    
+    #Calc sum by group t, s
+    result[i>=0, z_c := (z*c)]
+    result[i>=0, z_sum := sum(z_c),by =c('s')] 
+
+    result[i >= 0,
+           d := ((z*c*cap) / (z_sum)) ]
+    
+    #Apply formula
+    result[i >= 0,
+           z := a * ( z - d ) ]
+    
+    #Add time period
+    result[i >= -1,
+           t := j]
+    
+    result$i <- result$i+1
   
-  for(j in 1:x){
-    
-    #cap i at 26
-    result <- result %>%
-      dplyr::mutate(i = case_when(i > 26 ~ 26,
-                                  TRUE ~ i)) %>%
-      dplyr::group_by(i) %>%
-      dplyr::summarise(z = sum(z,na.rm=T))
-    
-    #apply formula
-    result['z'][result$i>=0,] <-
-      #first multiple everything by ta
-      (df_a['a']*
-         #First term: z(i) * a(i)
-         ((result['z'][result$i>=0,]) - 
-            #second term: theta(i)*c
-            (result['z'][result$i>=0,]*df_c['c']*cap_el)/(sum(result['z'][result$i>=0,]*df_c['c']))))
-    if(j == x){result$i <- result$i}else{result$i <- result$i + 1}
+    #allocate result appropriately
+    final_data[[j]] <- result[i>=0,]
   }
-  return(
-    list(
-      #number of breaches
-      b = sum(result['z'][result$i>=breach,]),
-      #number of waiters
-      w = sum(result['z'][result$i>=0,]),
-      #average wait times (w)
-      r = (sum(result['z'][result$i<=25,]*c(1:26))*(4.33))/sum(result['z'][result$i<=25,])
-    ))
+  #return func
+  return(final_data)
 }
 
+CreateCapacity <- function(x,specialties,growth,base_capacity){
+  expand_grid(t=c(1:x),s=specialties) %>%
+    dplyr::left_join(base_capacity,by=c('s')) %>%
+    mutate(cap = cap*(growth)^t)
+}
+
+CreateData <- function(df_data,ref_growth,capacity,policy,jitter_factor,breach_limit,a_lim){
+  
+  df_z_2 <- df_data %>%
+    dplyr::ungroup()%>%
+    #position as at latest (2024/03)
+    dplyr::filter(t == 35) %>%
+    dplyr::mutate(t=0) %>%
+    select(t,s,open,i) %>%
+    add_row(
+      CreateReferrals(1,sim_time,
+                      specialty=specs,
+                      growth=ref_growth,
+                      starting_value=starting_average,
+                      jitter_factor=jitter_factor)
+    ) %>%
+    rename(z='open')
+  
+  df_c <- df_data %>%
+    dplyr::mutate(c_a = completed/(open+completed))%>%
+    dplyr::group_by(i,s)
+  
+  # Fixed drop-off rates
+  df_a <- df_data %>%
+    dplyr::group_by(i,s) %>%
+    dplyr::summarise(a = quantile(a,a_lim,na.rm=T)) %>%
+    #this is the mother of all evil: 
+    #the drop-off is intensely consequential.
+    rbind(data.frame('i'=27,'a'=0.97,'s'=unique(df_2$s))) %>%
+    dplyr::mutate(a = case_when(is.nan(a)==TRUE ~ 0.5,
+                                T ~ a),
+                  i=i-1) %>%
+    dplyr::filter(i>=0)
+  
+  df_c <- df_c %>%
+    dplyr::summarise(
+      c = quantile(c_a,policy,na.rm=T),
+    )
+  
+  #Waitlist over time
+  data<- WaitList(x = sim_time,
+                  df_cap=capacity,
+                  result=df_z_2,
+                  df_a=df_a,
+                  df_c=df_c) %>%
+    data.table::rbindlist()
+
+  breaches <- data %>%
+    mutate(
+      breach_flag = case_when(
+        i > breach_limit ~ 'breach',
+        TRUE ~ 'not_breach')) %>%
+    ungroup()%>%
+    group_by(t,breach_flag) %>%
+    summarise(z = sum(z)) %>%
+    pivot_wider(values_from=z,names_from=breach_flag) %>%
+    mutate(tot = breach+not_breach)%>%
+    ungroup()
+    
+  return(list('breaches'=breaches,'capacity'=capacity))
+  
+}
+
+#Function to generate productivity changes across time
+CreateIndex <- function(w,d,r,prod,pay,drug,deflator){
+  1 + (( (w*(pay-prod)) + (r*(drug-prod)) + (d*(1-prod) )))
+}
+
+
+GetBreachRatio <- function(c_growth, breach_limit){
+  
+  capacity <- CreateCapacity(x=sim_time,
+                             specialties=specs,
+                             growth=c_growth, #this is what needs to be fixed.
+                             base_capacity=base_capacity)
+  
+  #Waitlist over time
+  data <-  WaitList(x = sim_time,
+                    df_cap=capacity,
+                    result=df_z,
+                    df_a=df_a,
+                    df_c=df_c) %>%
+    data.table::rbindlist()
+  
+  ratio <- sum(data[i >= breach_limit & t == max(t)]$z)/sum(data[i>=0 & t == max(t)]$z)
+  
+  return(ratio)
+  
+}
+
+GetTotalWaitlist <- function(c_growth){
+  
+  capacity <- CreateCapacity(x=sim_time,
+                             specialties=specs,
+                             growth=c_growth, #this is what needs to be fixed.
+                             base_capacity=base_capacity)
+  
+  #Waitlist over time
+  data<- WaitList(x = sim_time,
+                  df_cap=capacity,
+                  result=df_z_2,
+                  df_a=df_a,
+                  df_c=df_c) %>%
+    data.table::rbindlist()
+  
+  breaches <- data %>%
+    group_by(t) %>%
+    summarise(z = sum(z)) %>%
+    filter(t == max(t))
+  
+  return(breaches$z)
+}
+
+SimulatePatients <- function(sim_n,risk_lambda,sigma_matrix,means){
+  
+  if(missing(risk_lambda)){
+    risk_lambda <- 4
+  } else {
+    risk_lambda
+  }
+  
+  #Sex is assumed independent for now, 50-50 chance
+  sex <- sample(x=c('M','F'),size=sim_n,replace=T)
+  #Risk appetite can either be assumed related to deprivation, sev? here rand
+  risk_appetite <- rpois(n = sim_n,lambda = risk_lambda)
+  
+  #correlations
+  sim_data_1  <- MASS::mvrnorm(n = sim_n, 
+                               mu = means, 
+                               Sigma = sigma_matrix)
+  
+  #chosen columns
+  colnames(sim_data_1) <- c("deprivation", "age", "severity");
+  #create pat id col
+  sp <- data.table::data.table(
+    risk_appetite,
+    sex,
+    sim_data_1
+  )
+
+  #generate id
+  sp[,patient_id := ids::random_id(sim_n,4)]
+
+  return(sp)
+}
