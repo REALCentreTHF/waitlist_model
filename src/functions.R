@@ -139,7 +139,6 @@ CreateIndex <- function(w,d,r,prod,pay,drug,deflator){
   1 + (( (w*(pay-prod)) + (r*(drug-prod)) + (d*(1-prod) )))
 }
 
-
 GetBreachRatio <- function(c_growth, breach_limit){
   
   capacity <- CreateCapacity(x=sim_time,

@@ -3,10 +3,14 @@
 source("const/glob.R")
 source("src/functions.R")
 
-df_1 <- data.table::fread("output/df_1.csv")
-df_2 <- data.table::fread("output/df_2.csv")
-df_a <- data.table::fread("output/df_a.csv")
-df_c <- data.table::fread("output/df_c.csv")
+df_1 <- data.table::fread("output/df_1.csv") %>%
+  select(!V1)
+df_2 <- data.table::fread("output/df_2.csv")%>%
+  select(!V1)
+df_a <- data.table::fread("output/df_a.csv")%>%
+  select(!V1)
+df_c <- data.table::fread("output/df_c.csv")%>%
+  select(!V1)
 
 growth_stream <- df_1 %>%
   dplyr::filter(new != 0) %>%
@@ -28,7 +32,7 @@ base_capacity <- df_1 %>%
   summarise(cap = quantile(capacity, 0.5))
 
 df_data <- df_2
-sim_time <- 60
+sim_time <- 11*12
 ref_growth <- referral_growth
 jitter_factor <- 0
 a_lim <- 0.75
@@ -51,6 +55,12 @@ df_z <- df_data %>%
   rename(z = "open")
 
 # Create Outputs -----------
+
+df_c <- df_c %>%
+  group_by(i,t,s) %>%
+  dplyr::summarise(
+    c = quantile(c_a,0.5,na.rm=T),
+  )
 
 breach_ratio <- expand_grid(
   capacity = ((1000 + c(0:60)) / 1000)
