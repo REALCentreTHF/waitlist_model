@@ -68,7 +68,7 @@ old_data <- df_2 %>%
 
 capacity_ideal <- CreateCapacity(x=sim_time,
                             specialties=specs,
-                            growth=1.03^(1/12),
+                            growth=1.038^(1/12),
                             base_capacity=base_capacity)
 
 capacity_baseline <- CreateCapacity(x=sim_time,

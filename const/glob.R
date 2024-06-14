@@ -24,7 +24,7 @@ thf<-'#dd0031'
 thf2 <- '#2a7979'
 
 capacity_growth <- (1.025)^(1/12)
-referral_growth <- (1.02)^(1/12)
+referral_growth <- (1.028)^(1/12)
 
 w <- 0.632
 d <- 0.292

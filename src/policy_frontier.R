@@ -3,13 +3,13 @@
 source("const/glob.R")
 source("src/functions.R")
 
-df_1 <- data.table::fread("output/df_1.csv") %>%
+df_1 <- data.table::fread("const/df_1.csv") %>%
   select(!V1)
-df_2 <- data.table::fread("output/df_2.csv")%>%
+df_2 <- data.table::fread("const/df_2.csv")%>%
   select(!V1)
-df_a <- data.table::fread("output/df_a.csv")%>%
+df_a <- data.table::fread("const/df_a.csv")%>%
   select(!V1)
-df_c <- data.table::fread("output/df_c.csv")%>%
+df_c <- data.table::fread("const/df_c.csv")%>%
   select(!V1)
 
 growth_stream <- df_1 %>%

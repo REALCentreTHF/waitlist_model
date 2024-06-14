@@ -185,6 +185,16 @@ GetTotalWaitlist <- function(c_growth){
 
 SimulatePatients <- function(sim_n,risk_lambda,sigma_matrix,means){
   
+  #' This function simulates patients needed for the underlying matrix
+  #' model using a set of risk factors and a covariance matrix of
+  #' deprivation, age, and severity
+  #' Sex is assumed a 50-50 chance. 
+  #' @param x integer Length of simulation in months
+  #' @param result dataframe Dataframe of wait times by bucket
+  #' @param df_cap dataframe Dataframe of capacity growth over time
+  #' @param df_a dataframe Dataframe of drop-off by buckets
+  #' @param df_c dataframe Dataframe of treatment assumptions
+  
   if(missing(risk_lambda)){
     risk_lambda <- 4
   } else {
@@ -194,7 +204,7 @@ SimulatePatients <- function(sim_n,risk_lambda,sigma_matrix,means){
   #Sex is assumed independent for now, 50-50 chance
   sex <- sample(x=c('M','F'),size=sim_n,replace=T)
   #Risk appetite can either be assumed related to deprivation, sev? here rand
-  risk_appetite <- rpois(n = sim_n,lambda = risk_lambda)
+  risk_appetite <- rpois(n = sim_n, lambda = risk_lambda)
   
   #correlations
   sim_data_1  <- MASS::mvrnorm(n = sim_n, 
