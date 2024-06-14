@@ -139,7 +139,7 @@ CreateIndex <- function(w,d,r,prod,pay,drug,deflator){
   1 + (( (w*(pay-prod)) + (r*(drug-prod)) + (d*(1-prod) )))
 }
 
-GetBreachRatio <- function(c_growth, breach_limit){
+GetBreachRatio <- function(c_growth, referrals,breach_limit){
   
   capacity <- CreateCapacity(x=sim_time,
                              specialties=specs,
@@ -149,7 +149,7 @@ GetBreachRatio <- function(c_growth, breach_limit){
   #Waitlist over time
   data <-  WaitList(x = sim_time,
                     df_cap=capacity,
-                    result=df_z,
+                    result=referrals,
                     df_a=df_a,
                     df_c=df_c) %>%
     data.table::rbindlist()

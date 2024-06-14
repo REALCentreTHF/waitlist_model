@@ -22,14 +22,14 @@ growth_stream <- df_1 %>%
 # mean of the past 12 months
 starting_average <- (growth_stream %>%
   filter(t <= max(t) - 12))$new %>%
-  mean()
+  median()
 
 base_capacity <- df_1 %>%
   dplyr::group_by(t, s) %>%
   dplyr::summarise(capacity = sum(completed)) %>%
   group_by(s) %>%
   filter(t >= max(t) - 12) %>%
-  summarise(cap = quantile(capacity, 0.5))
+  summarise(cap = median(capacity, 0.75))
 
 df_data <- df_2
 sim_time <- 11*12
@@ -41,7 +41,7 @@ policy <- 0.5
 df_z <- df_data %>%
   dplyr::ungroup() %>%
   # position as at latest
-  dplyr::filter(t == max(t)) %>%
+  dplyr::filter(t == 35) %>%
   dplyr::mutate(t = 0) %>%
   select(t, s, open, i) %>%
   add_row(
@@ -66,7 +66,9 @@ breach_ratio <- expand_grid(
   capacity = ((1000 + c(0:60)) / 1000)
 ) %>%
   rowwise() %>%
-  mutate(breach_ratio = GetBreachRatio(c_growth = capacity^(1 / 12), breach_limit = 4))
+  mutate(breach_ratio = GetBreachRatio(referrals = df_z,c_growth = capacity^(1 / 12), breach_limit = 4))
+
+df_z_2 <- df_z
 
 waitlist_size <- expand_grid(
   capacity = ((1000 + c(0:60)) / 1000)

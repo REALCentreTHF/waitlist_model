@@ -3,10 +3,10 @@
 source('const/glob.R')
 source('src/functions.R')
 
-df_1 <- data.table::fread('output/df_1.csv')
-df_2 <- data.table::fread('output/df_2.csv')
-df_a <- data.table::fread('output/df_a.csv')
-df_c <- data.table::fread('output/df_c.csv')
+df_1 <- data.table::fread('const/df_1.csv')
+df_2 <- data.table::fread('const/df_2.csv')
+df_a <- data.table::fread('const/df_a.csv')
+df_c <- data.table::fread('const/df_c.csv')
 
 # Raw inputs ----------------------------------------------------------
 
@@ -45,26 +45,31 @@ old_data <- df_2 %>%
   dplyr::mutate(tot=breach+not_breach) %>%
   dplyr::ungroup()
 
-capacity_0_5 <- CreateCapacity(x=60,
-                           specialties=specs,
-                           growth=1.049^(1/12),
-                           base_capacity=base_capacity)
+# capacity_0_5 <- CreateCapacity(x=60,
+#                            specialties=specs,
+#                            growth=1.049^(1/12),
+#                            base_capacity=base_capacity)
+# 
+# midterm_capacity <- capacity_0_5%>%filter(t==max(t)) %>% select(!t)
+# 
+# capacity_5_10 <- CreateReferrals(min_x=1,
+#                                  max_x=sim_time,
+#                                  specialty = specs,
+#                                  growth = referral_growth,
+#                                  starting_value = starting_average,
+#                                  jitter_factor = 0) %>% 
+#   filter(i <= -60) %>%
+#   select(!i) %>%
+#   rename('cap'=open) %>%
+#   mutate(cap = cap*0.974)
+#                                
+# capacity_ideal <- rbind(capacity_0_5,
+#                   capacity_5_10)
 
-midterm_capacity <- capacity_0_5%>%filter(t==max(t)) %>% select(!t)
-
-capacity_5_10 <- CreateReferrals(min_x=1,
-                                 max_x=sim_time,
-                                 specialty = specs,
-                                 growth = referral_growth,
-                                 starting_value = starting_average,
-                                 jitter_factor = 0) %>% 
-  filter(i <= -60) %>%
-  select(!i) %>%
-  rename('cap'=open) %>%
-  mutate(cap = cap*0.974)
-                               
-capacity_ideal <- rbind(capacity_0_5,
-                  capacity_5_10)
+capacity_ideal <- CreateCapacity(x=sim_time,
+                            specialties=specs,
+                            growth=1.03^(1/12),
+                            base_capacity=base_capacity)
 
 capacity_baseline <- CreateCapacity(x=sim_time,
                                     specialties=specs,
@@ -95,8 +100,7 @@ ideal <- CreateData(df_data = df_2,
 
 waitlist_plot <- ggplot() +
   geom_line(data=old_data,aes(x=t,y=tot/1e6),linetype=1,linewidth=1)+
-  geom_line(data=baseline,aes(x=t,y=tot/1e6),linetype=1,col=thf,linewidth=1)+
-  geom_line(data=ideal,aes(x=t,y=tot/1e6),linetype=1,col=thf2,linewidth=1)+
+  geom_line(data=ideal,aes(x=t,y=tot/1e6),linetype=2,col=thf,linewidth=1)+
   geom_vline(xintercept = 0,col='gray')+
   geom_vline(xintercept = 59,col='gray')+
   theme_bw(base_size=16) +
