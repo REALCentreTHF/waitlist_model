@@ -197,6 +197,7 @@ SimulatePatients <- function(sim_n,risk_lambda,sigma_matrix,means){
   #' @param risk_lambda integer Lambda variable for poisson distribution of risk where default is set to 4
   #' @param sigma_matrix matrix Covariance matrix of severity, age and deprivation
   #' @param means vector Vector of means 
+  #' @return sp dataframe of individual patients simulated
 
   if(missing(risk_lambda)){
     risk_lambda <- 4
@@ -223,52 +224,6 @@ SimulatePatients <- function(sim_n,risk_lambda,sigma_matrix,means){
     sim_data_1
   )
 
-  #generate id
-  sp[,id := paste0('pat_',ids::random_id(sim_n,4))]
-  
-  return(sp)
-}
-
-SimulatePatients <- function(sim_n,risk_lambda,sigma_matrix,means){
-  
-  #' This function simulates elective patients by sex, age, severity and risk appetite
-  #' 
-  #' @description
-  #' This function simulates patients needed for the underlying matrix
-  #'  #' generating a data.table of patients by id containing age, severity, 
-  #'  risk appetite,sex and deprivation.
-  #'  #' model using a set of risk factors and a covariance matrix of
-  #'  #' deprivation, age, and severity where sex is assumed a 50-50 chance. 
-  #' @param sim_n integer Number of simulated patients
-  #' @param risk_lambda integer Lambda variable for poisson distribution of risk where default is set to 4
-  #' @param sigma_matrix matrix Covariance matrix of severity, age and deprivation
-  #' @param means vector Vector of means 
-  
-  if(missing(risk_lambda)){
-    risk_lambda <- 4
-  } else {
-    risk_lambda
-  }
-  
-  #Sex is assumed independent for now, 50-50 chance
-  sex <- sample(x=c('M','F'),size=sim_n,replace=T)
-  #Risk appetite can either be assumed related to deprivation, sev? here rand
-  risk_appetite <- rpois(n = sim_n, lambda = risk_lambda)
-  
-  #correlations
-  sim_data_1  <- MASS::mvrnorm(n = sim_n, 
-                               mu = means, 
-                               Sigma = sigma_matrix)
-  
-  #chosen columns
-  colnames(sim_data_1) <- c("deprivation", "age", "severity");
-  #create pat id col
-  sp <- data.table::data.table(
-    risk_appetite,
-    sex,
-    sim_data_1
-  )
-  
   #generate id
   sp[,id := paste0('pat_',ids::random_id(sim_n,4))]
   

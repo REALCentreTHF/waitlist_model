@@ -204,3 +204,67 @@ cost_5yr_ideal <- activity_5yr_ideal %>%
   mutate(date = zoo::as.yearmon(date)) %>%
   group_by(year(date),type)%>%
   summarise(cost=sum(cost,na.rm=T)/1e9,)
+
+growth_assumptions <- growth_assumptions %>%
+  group_by(scenario) %>%
+  mutate(
+    prod = case_when(
+      is.na(val_prod/lag(val_prod)) == T ~ 1,
+      T ~val_prod/lag(val_prod)),
+    pay = case_when(
+      is.na(val_pay/lag(val_pay)) == T ~ 1,
+      T ~ val_pay/lag(val_pay))
+  ) %>%
+  select(!c(val_prod,val_pay))
+
+final_cost_data <- cost_10yr_ideal %>%
+  rename(year='year(date)',
+         cost_10yr = 'cost') %>%
+  left_join(.,cost_5yr_ideal %>%
+              rename(year='year(date)',
+                     cost_5yr = 'cost'),
+            by=c('year','type')) %>%
+  filter(year != 2036) %>%
+  group_by(type) %>%
+  mutate(drug = 1.0489,
+         val_drug = cumprod(drug)) %>%
+  left_join(.,
+            growth_assumptions %>%
+              filter(scenario == '10-year') %>%
+              ungroup()%>%
+              select(fyear,prod,pay),
+            by=c('year'='fyear')) %>%
+  ungroup()%>%
+  rowwise() %>%
+  mutate(index = CreateIndex(w=w,
+                             d = d,
+                             r = r,
+                             prod = prod,
+                             drug = val_drug,
+                             pay = pay,
+                             deflator = 1),
+         cost_5yr = cost_5yr * index,
+         cost_10yr = cost_10yr * index) %>%
+  group_by(year) %>%
+  summarise(cost_10yr = sum(cost_10yr,na.rm=T),
+            cost_5yr = sum(cost_5yr,na.rm=T))
+
+data_2023 <-
+  df_2 %>%
+  filter(t >= max(t)-12) %>%
+  summarise(cap = sum(completed,na.rm=T)) %>%
+  mutate(
+    first = cap,
+    fups = costs$fup_ratio * cap,
+    ncl = (ncl_ratio) * (costs$fup_ratio + 1) * (1-proc_ratio)* cap,
+    cl = (1-ncl_ratio) * (costs$fup_ratio + 1)* (1-proc_ratio)*cap,
+    proc = (proc_ratio) * (costs$fup_ratio + 1)* cap,
+    non_proc = (1-proc_ratio) * (costs$fup_ratio + 1)* cap,
+    dc = costs$admit_ratio * costs$daycase_ratio * cap,
+    ord = costs$admit_ratio * costs$ordinary_ratio * cap) %>%
+  select(!cap) %>%
+  mutate(ncl_costing = ncl * ncl_cost,
+         cl_costing = cl * cl_cost,
+         in_cost = ord * in_cost,
+         dc_cost = dc * dc_cost,
+         proc_cost = proc * proc_cost)

@@ -19,17 +19,18 @@ spec_names <- data.table::fread('const/spec_names.csv')
 
 rtt_link <- 'https://www.england.nhs.uk/statistics/statistical-work-areas/rtt-waiting-times/'
 
+growth_assumptions <-read.csv('https://raw.githubusercontent.com/zeyadissa/budget_scenarios/main/const/growth_scenarios.csv')
+
 thf<-'#dd0031'
 
 thf2 <- '#2a7979'
 
-capacity_growth <- (1.025)^(1/12)
+#from funding proj model
 referral_growth <- (1.028)^(1/12)
 
-w <- 0.632
-d <- 0.292
+w <- 0.605
+d <- 0.304
 r <- 1 - w - d
-ideal_growth <- 1.052
 
 costs <- data.frame(
   'metric' = c('admit_ratio','daycase_ratio','fup_ratio','ordinary_ratio'),

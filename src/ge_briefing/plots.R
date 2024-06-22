@@ -47,3 +47,14 @@ breach_plot <- ggplot() +
   geom_hline(yintercept=0.08)
 
 ggsave(filename='output/breach_plot.png',breach_plot)
+
+# Cost over time -----
+
+cost_plot <- ggplot() +
+  geom_line(data=final_cost_data,aes(x=year,y=cost_5yr),col=thf2,linewidth=1)+
+  geom_line(data=final_cost_data,aes(x=year,y=cost_10yr),col=thf,linewidth=1)+
+  theme_bw(base_size=16) +
+  xlab('') +
+  ylab('Required funding (£bn)')
+
+ggsave(filename='output/cost_plot.png',cost_plot)
