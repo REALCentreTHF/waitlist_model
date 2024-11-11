@@ -58,3 +58,7 @@ cost_plot <- ggplot() +
   ylab('Required funding (£bn)')
 
 ggsave(filename='output/cost_plot.png',cost_plot)
+
+write.csv(old_data,'output/breach_old.csv')
+write.csv(breach_10yr_data,'output/breach_10yr.csv')
+write.csv(breach_5yr_data,'output/breach_5yr.csv')

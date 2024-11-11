@@ -61,11 +61,6 @@ capacity_ideal_10yr <- CreateCapacity(x=sim_time,
                             growth=capacity_10yr,
                             base_capacity=base_capacity)
 
-capacity_baseline <- CreateCapacity(x=sim_time,
-                                    specialties=specs,
-                                    growth=capacity_growth,
-                                    base_capacity=base_capacity)
-
 capacity_0_5 <- CreateCapacity(x=60,
                            specialties=specs,
                            growth=capacity_5yr,
