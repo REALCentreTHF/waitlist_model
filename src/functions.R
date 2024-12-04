@@ -229,3 +229,16 @@ SimulatePatients <- function(sim_n,risk_lambda,sigma_matrix,means){
   
   return(sp)
 }
+
+GetPolicyFrontier <- function(cap_range,referrals,breach_limit=4){
+  dat<-expand_grid(
+    capacity = ((1000 + c(cap_range)) / 1000)
+  ) |> 
+    dplyr::rowwise() |> 
+    dplyr::mutate(breach_ratio = GetBreachRatio(
+      referrals = referrals,
+      c_growth = capacity ^(1/12),
+      breach_limit = breach_limit
+    ))
+  return(dat)
+}

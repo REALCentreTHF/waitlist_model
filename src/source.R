@@ -2,13 +2,19 @@
 
 source('src/functions.R')
 source('const/glob.R')
-source('https://raw.githubusercontent.com/zeyadissa/open_health_data/main/src/functions.R')
 
 # Raw RTT data -------------------------------------------------------------
 
 #Urls for datasets (1:3 means it only gets the past 3 years)
-rtt_urls <- GetLinks(rtt_link,'statistical-work-areas/rtt-waiting-times/rtt-data-')[c(1:3)]
-rtt_files <- GetLinks(rtt_urls,'Full-CSV-data')
+rtt_urls <- Rpublic::extract_links(rtt_link,'statistical-work-areas/rtt-waiting-times/rtt-data-')[c(1:3)]
+
+rtt_files <- purrr::map(
+  .x = rtt_urls,
+  .f = Rpublic::extract_links,
+  pattern = 'Full-CSV-data'
+) |> 
+  unlist() |> 
+  unique()
 
 #Apply function to all .zip links
 rtt_data <- sapply(rtt_files,

@@ -32,7 +32,8 @@ base_capacity <- df_1 %>%
   summarise(cap = median(capacity, 0.75))
 
 df_data <- df_2
-sim_time <- 11*12
+#50 MONTHS from now is MARCH 2029 (latest)
+sim_time <- 51
 ref_growth <- referral_growth
 jitter_factor <- 0
 a_lim <- 0.75
@@ -63,7 +64,7 @@ df_c <- df_c %>%
   )
 
 breach_ratio <- expand_grid(
-  capacity = ((1000 + c(0:60)) / 1000)
+  capacity = ((1000 + c(40:80)) / 1000)
 ) %>%
   rowwise() %>%
   mutate(breach_ratio = GetBreachRatio(referrals = df_z,c_growth = capacity^(1 / 12), breach_limit = 4))
