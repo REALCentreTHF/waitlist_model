@@ -263,3 +263,8 @@ data_2023 <-
          in_cost = ord * in_cost,
          dc_cost = dc * dc_cost,
          proc_cost = proc * proc_cost)
+
+write.csv(cost_5yr_ideal,'output/hiba_output/costs_5yr.csv')
+write.csv(cost_10yr_ideal,'output/hiba_output/costs_10yr_ideal.csv')
+write.csv(activity_5yr_ideal,'output/hiba_output/activity_5yr_ideal.csv')
+write.csv(activity_10yr_ideal,'output/hiba_output/activity_10yr_ideal.csv')

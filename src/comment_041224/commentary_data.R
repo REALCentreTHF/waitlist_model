@@ -220,7 +220,8 @@ baseline_data_activity <- CreateData(df_data = df_2,
                             policy = 0.5,
                             breach_limit = 4,
                             jitter_factor = 0,
-                            a_lim = 0.75)$capacity
+                            a_lim = 0.75)$capacity |> 
+  mutate(date = make_date(year = 2024, month = 9, day = 1) %m+% months((t)))
 
 high_data_activity <- CreateData(df_data = df_2,
                         ref_growth = high_ref_growth,
@@ -228,7 +229,9 @@ high_data_activity <- CreateData(df_data = df_2,
                         policy = 0.5,
                         breach_limit = 4,
                         jitter_factor = 0,
-                        a_lim = 0.75)$capacity
+                        a_lim = 0.75)$capacity |> 
+  mutate(date = make_date(year = 2024, month = 9, day = 1) %m+% months((t)))
+
 
 low_data_activity <- CreateData(df_data = df_2,
                        ref_growth = low_ref_growth,
@@ -236,42 +239,26 @@ low_data_activity <- CreateData(df_data = df_2,
                        policy = 0.5,
                        breach_limit = 4,
                        jitter_factor = 0,
-                       a_lim = 0.75)$capacity
+                       a_lim = 0.75)$capacity |> 
+  mutate(date = make_date(year = 2024, month = 9, day = 1) %m+% months((t)))
+
 
 # PLOTS ----------
 
-ggplot() +
-  geom_line(data=old_data,aes(x=t,y=tot/1e6),linetype=1,linewidth=1)+
-  geom_line(data=baseline_data,aes(x=t,y=tot/1e6),linetype=2,linewidth=1)
-
-long_term_data |> 
-  mutate(cap = total,
-         s = 'C_999') |> 
-  select(t,s,cap) |> 
-  base::rbind(low_data_activity |> 
-                filter(t == 1)) |> 
-  dplyr::rowwise() |> 
-  mutate(date = make_date(year =2007-08-01) %m+% months(abs(t)))
-
-ggplot() +
+plot <- ggplot() +
   geom_line(data=long_term_data |> 
               mutate(cap = total,
                      s = 'C_999') |> 
               select(t,s,cap) |> 
               base::rbind(low_data_activity |> 
-                      filter(t == 1)) |> 
+                      filter(t == 1) |> 
+                        select(!date)) |> 
               dplyr::rowwise() |> 
               mutate(date = make_date(year = 2024, month = 9, day = 1) %m+% months((t)))
             ,aes(x=date,y=cap/1e6),linetype=1) + 
-  geom_line(data=low_data_activity |> 
-              mutate(date = make_date(year = 2024, month = 9, day = 1) %m+% months((t)))
-            ,aes(x=date,y=cap/1e6),linetype=2)+
-  geom_line(data=baseline_data_activity |> 
-              mutate(date = make_date(year = 2024, month = 9, day = 1) %m+% months((t)))
-            ,aes(x=date,y=cap/1e6),linetype=1)+
-  geom_line(data=high_data_activity |> 
-              mutate(date = make_date(year = 2024, month = 9, day = 1) %m+% months((t)))
-            ,aes(x=date,y=cap/1e6),linetype=2) +
+  geom_line(data=low_data_activity,aes(x=date,y=cap/1e6),linetype=2)+
+  geom_line(data=baseline_data_activity,aes(x=date,y=cap/1e6),linetype=1)+
+  geom_line(data=high_data_activity,aes(x=date,y=cap/1e6),linetype=2) +
   theme_bw() +
   xlab('Months from present') +
   ylab('Completed RTT pathways (millions)') +
@@ -280,5 +267,15 @@ ggplot() +
     subtitle = 'Historic and Projected Completed pathways needed to achieve Constitutional Standards'
   )
 
-  
+all_act_data <- baseline_data_activity |> 
+  mutate(type = 'baseline') |> 
+  rbind(
+    low_data_activity |> 
+      mutate(type = 'low_referral_growth')
+  ) |> 
+  rbind(high_data_activity |> 
+          mutate(type = 'high_referral_growth'))
+
+ggsave(filename = 'const/commentary_plot.png',plot=plot)
+write.csv(all_act_data,'const/activity_data.csv')  
 
