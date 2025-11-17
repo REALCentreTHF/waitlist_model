@@ -25,13 +25,15 @@ thf<-'#dd0031'
 
 thf2 <- '#2a7979'
 
-#from funding proj model
+#from funding proj model - this is the long-term observed referral growth rate
+#across the pre and post-covid eriod.
 referral_growth <- (1.028)^(1/12)
 
 w <- 0.605
 d <- 0.304
 r <- 1 - w - d
 
+#variation of single activity per each pathway
 costs <- data.frame(
   'metric' = c('admit_ratio','daycase_ratio','fup_ratio','ordinary_ratio'),
   'lq' = c(0.4201232,0.3414877,2.2372,0.0750734),
@@ -65,3 +67,10 @@ data_2018 <- data.table::fread('const/rtt_data.csv') %>%
   group_by(date) %>%
   summarise(completed = sum(completed,na.rm=T),
             new_rtt = sum(new_rtt_periods_all_patients,na.rm=T))
+
+#Variables for modelling constitutional standards
+sim_time <- 44 #time for parliament end
+jitter_factor <- 0 #this adds randomness to the priority mechanism. all set to 0
+a_lim <- 0.75 #this ontrols for drop-offs weighing.
+policy <- 0.5 #policy selection: applies weighting differently to longer wait times. set to 0.5
+breach_month <- 4

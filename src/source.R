@@ -17,25 +17,24 @@ rtt_files <- purrr::map(
   unique()
 
 #Apply function to all .zip links
-rtt_data <- sapply(rtt_files,
+rtt_data <- purrr::map(rtt_files,
                    function(x){
-                     UnzipCSV(x)
-                   })
+                     Rpublic::extract_zipped(x,'')
+                   }) |> 
+  purrr::flatten() |> 
+  dplyr::bind_rows()
 
 #Cleans the underlying data to get what we want: note the data changes from apr 2021 onwards
 #and data structure changes: suddenly it no longer sums up +52s and sums up to 104s+
-df_0 <- lapply(rtt_data,
-               function(x){
-                 x %>%
-                   #Create date column
-                   dplyr::mutate(date = as.Date(paste0('01-',substr(period,5,99)),'%d-%B-%Y')) %>%
-                   #Select ALL specialties
-                   #dplyr::filter(treatment_function_name == 'Total') %>%
-                   dplyr::rename( 'trust_code' = provider_org_code) %>%
-                   dplyr::select(date,rtt_part_description,treatment_function_code,starts_with('gt'),total_all)
-               }) %>%
-  #Bind everything together
-  data.table::rbindlist()
+df_0 <- rtt_data2 |> 
+  janitor::clean_names() |> 
+  #Create date column
+  dplyr::mutate(date = as.Date(paste0('01-',substr(period,5,99)),'%d-%B-%Y')) |> 
+  #Select ALL specialties
+  #dplyr::filter(treatment_function_name == 'Total') %>%
+  dplyr::rename( 'trust_code' = provider_org_code) |> 
+  dplyr::select(date,rtt_part_description,treatment_function_code,starts_with('gt'),total_all)
+              
 
 # Wrangling ----------------------------------------------------------
  
