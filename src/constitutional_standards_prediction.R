@@ -34,60 +34,7 @@ starting_average <- (growth_stream %>%
                        filter(t <= max(t)-12))$new %>% 
   mean()
 
-old_data <- df_2 %>%
-  dplyr::mutate(t=t-max(t),
-                z =  open)%>%
-  dplyr::mutate(
-    breach_flag = dplyr::case_when(
-      i > 4 ~ 'breach',
-      TRUE ~ 'not_breach')) %>%
-  dplyr::group_by(t,breach_flag) %>%
-  dplyr::summarise(z=sum(z)) %>%
-  tidyr::pivot_wider(values_from=z,names_from=breach_flag) %>%
-  dplyr::mutate(tot=breach+not_breach,
-                ratio = breach/tot) %>%
-  dplyr::ungroup()
-
-old_data_time <- df_2 %>%
-  dplyr::mutate(t=t-max(t),
-                z =  open)%>%
-  select(t,i,z) %>%
-  drop_na() %>%
-  dplyr::group_by(t) %>%
-  dplyr::summarise(m = median(sum(i*z)/sum(z))*4.33)
-
-
-growth_stream <- df_1 %>%
-  dplyr::filter(new != 0) %>%
-  dplyr::ungroup() %>%
-  dplyr::select(t, new, s) %>%
-  dplyr::arrange(t) %>%
-  tidyr::drop_na()
-
-old_capacity <- df_1 %>%
-  dplyr::mutate(t=t-max(t)) |> 
-  dplyr::ungroup() %>%
-  dplyr::select(t, completed) %>%
-  group_by(t) |> 
-  summarise(completed = sum(completed,na.rm=T)) |> 
-  dplyr::arrange(t) %>%
-  tidyr::drop_na()
-
-# mean of the past 12 months
-starting_average <- (growth_stream %>%
-                       filter(t <= max(t) - 12))$new %>%
-  median()
-
-base_capacity <- df_1 %>%
-  dplyr::group_by(t, s) %>%
-  dplyr::summarise(capacity = sum(completed)) %>%
-  group_by(s) %>%
-  filter(t >= max(t) - 12) %>%
-  summarise(cap = median(capacity, 0.75))
-
-df_data <- df_2
-
-df_z <- df_data %>%
+df_z <- df_2 %>%
   dplyr::ungroup() %>%
   # position as at latest
   dplyr::filter(t == 35) %>%
@@ -96,7 +43,7 @@ df_z <- df_data %>%
   add_row(
     CreateReferrals(1, sim_time,
                     specialty = specs,
-                    growth = ref_growth,
+                    growth = referral_growth,
                     starting_value = starting_average,
                     jitter_factor = jitter_factor
     )
@@ -108,7 +55,6 @@ df_c <- df_c %>%
   dplyr::summarise(
     c = quantile(c_a,0.5,na.rm=T),
   )
-
 # Find ----------------------------------------------------------
 
 baseline_breach_data <- GetPolicyFrontier(
@@ -125,7 +71,7 @@ growth_rate<-(baseline_breach_data |>
 
 capacity <- CreateCapacity(x=sim_time,
                                       specialties=specs,
-                                      growth=cap_baseline_growth,
+                                      growth=(growth_rate)^(1/12),
                                       base_capacity=base_capacity)
 
 
@@ -181,4 +127,3 @@ plot <- ggplot() +
 
 ggsave(filename = 'const/commentary_plot.png',plot=plot)
 write.csv(total_activity,'const/activity_data.csv')  
-

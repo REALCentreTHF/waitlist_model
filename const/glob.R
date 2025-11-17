@@ -27,7 +27,7 @@ thf2 <- '#2a7979'
 
 #from funding proj model - this is the long-term observed referral growth rate
 #across the pre and post-covid eriod.
-referral_growth <- (1.028)^(1/12)
+referral_growth <- (1.015)^(1/12)
 
 w <- 0.605
 d <- 0.304
