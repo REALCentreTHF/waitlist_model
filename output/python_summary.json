@@ -1,0 +1,24 @@
+{
+  "config": {
+    "sim_time": 44,
+    "jitter_factor": 0.0,
+    "drop_off_quantile": 0.75,
+    "policy_quantile": 0.5,
+    "breach_month": 4,
+    "referral_growth": 1.0012414877164493,
+    "capacity_growth": 1.0055365868732713,
+    "specs": [
+      "C_999"
+    ],
+    "breach_limit_months": 4,
+    "random_seed": null,
+    "output_start": [
+      2024,
+      9,
+      1
+    ]
+  },
+  "final_month": 44,
+  "final_waiters": 2400360.980135213,
+  "breach_ratio": 0.04372397980790008
+}
