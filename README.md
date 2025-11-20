@@ -35,3 +35,18 @@ Tentative results are positive: here we model a massive shock to the system (in 
 ![Alt Text](https://github.com/zeyadissa/WaitlistModel/blob/main/res/animation.gif)
 
 Crucially we see the impact on average wait times and the proportion of breaches (Which shoot up from 30 to 60%). This is very rudimentary, but it showcases how a shock to the system can break it in the long-term, with no sign of recovery even 2 years down the line (at best, stagnation...)
+
+## Running the Python model
+
+The original analysis was written in R. This repository now includes a Python implementation so the projections can be re-created directly in this environment without relying on the missing `Rscript` binary.
+
+1. Ensure you are in the repository root.
+2. Run the simulator: `python run_analysis.py`
+
+The script reads the historical inputs stored under `const/budget_nov_run/`, reproduces the waitlist simulation with a pure Python implementation, and saves the following artefacts in `output/`:
+
+- `python_breach_summary.csv`: breach and non-breach counts per simulated month.
+- `python_waitlist_projection.csv`: the full waitlist trajectory by specialty, bucket, and month.
+- `python_summary.json`: configuration metadata plus the final waitlist size and breach ratio.
+
+The Python implementation lives in the `pywaitlist/` package. See `run_analysis.py` for a compact example of how to load the inputs, build capacity scenarios, and call the simulator.
